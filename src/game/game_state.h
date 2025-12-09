@@ -26,15 +26,16 @@ struct Player {
 class GameState {
 private:
     GameMode state;
-    Player players[2];         // NEW: Array of two players
+    Player players[2];         // Array of two players
     MazeGenerator maze;
-    
-    uint8_t active_player;     // NEW: 0 or 1 (whose turn)
-    uint8_t winner;            // NEW: 0, 1, or 255 (no winner)
-    bool two_player_mode;      // NEW: Mode toggle flag
+    SpriteInstance goal_sprite;  // Animated goal sprite
+
+    uint8_t active_player;     // 0 or 1 (whose turn)
+    uint8_t winner;            // 0, 1, or 255 (no winner)
+    bool two_player_mode;      // Mode toggle flag
 
     void resetGame();
-    
+
     // Internal helpers
     void handleSinglePlayerMove(Direction dir);
     void handleTwoPlayerMove(Direction dir);
@@ -48,6 +49,7 @@ private:
     void renderWinScreen(DisplayManager* display);
     bool isAdjacent(const Player& p, uint8_t gx, uint8_t gy);
     bool canReachGoal(const Player& p, uint8_t gx, uint8_t gy);
+    uint16_t getGoalColorForDistance(uint8_t min_distance);
 
 public:
     GameState(); // Constructor

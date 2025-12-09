@@ -43,6 +43,10 @@ public:
     static void draw(DisplayManager* display, const SpriteInstance* instance,
                      int16_t x, int16_t y);
 
+    // Render sprite with color tinting (replaces non-transparent pixels with tint_color)
+    static void drawWithColorTint(DisplayManager* display, const SpriteInstance* instance,
+                                   int16_t x, int16_t y, uint16_t tint_color);
+
 private:
     // Get current frame pointer from animation
     static const uint16_t* getCurrentFrame(const SpriteInstance* instance);

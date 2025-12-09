@@ -2,6 +2,7 @@
 #include "game_state.h"
 #include "../config.h"
 #include "../sprites/player_sprites.h"
+#include "../sprites/goal_sprites.h"
 
 GameState::GameState() {
     two_player_mode = false; // Default
@@ -150,6 +151,9 @@ void GameState::resetGame() {
 
     maze.setGoal(gx, gy);
 
+    // Initialize goal sprite
+    SpriteRenderer::initInstance(&goal_sprite, &GOAL_SPRITE);
+
     active_player = 0;  // Player 1 starts
     winner = 255;       // No winner yet
     state = STATE_PLAYING;
@@ -271,6 +275,7 @@ void GameState::update() {
     if (two_player_mode) {
         SpriteRenderer::updateAnimation(&players[1].sprite);
     }
+    SpriteRenderer::updateAnimation(&goal_sprite);
 }
 
 void GameState::render(DisplayManager* display) {
@@ -330,22 +335,29 @@ void GameState::renderPlayerFog(DisplayManager* display, const Player& p, uint16
     uint8_t gx = maze.getGoalX();
     uint8_t gy = maze.getGoalY();
 
-    // Draw each valid adjacent cell (don't overdraw goal)
+    // Helper lambda for drawing thick bordered cells
+    auto drawThickBorder = [&](int16_t x, int16_t y) {
+        // Draw 2-pixel thick border (outer + inner rectangle)
+        display->drawRect(x, y, CELL_SIZE, CELL_SIZE, fog_color);
+        display->drawRect(x+1, y+1, CELL_SIZE-2, CELL_SIZE-2, fog_color);
+    };
+
+    // Draw border for each valid adjacent cell (don't overdraw goal)
     if ((dirs & (1 << NORTH)) && p.y > 0) {
         if (!(p.x == gx && p.y - 1 == gy))
-            display->fillRect(p.x * CELL_SIZE, (p.y - 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE, fog_color);
+            drawThickBorder(p.x * CELL_SIZE, (p.y - 1) * CELL_SIZE);
     }
     if ((dirs & (1 << SOUTH)) && p.y < MAZE_SIZE - 1) {
         if (!(p.x == gx && p.y + 1 == gy))
-            display->fillRect(p.x * CELL_SIZE, (p.y + 1) * CELL_SIZE, CELL_SIZE, CELL_SIZE, fog_color);
+            drawThickBorder(p.x * CELL_SIZE, (p.y + 1) * CELL_SIZE);
     }
     if ((dirs & (1 << EAST)) && p.x < MAZE_SIZE - 1) {
         if (!(p.x + 1 == gx && p.y == gy))
-            display->fillRect((p.x + 1) * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, fog_color);
+            drawThickBorder((p.x + 1) * CELL_SIZE, p.y * CELL_SIZE);
     }
     if ((dirs & (1 << WEST)) && p.x > 0) {
         if (!(p.x - 1 == gx && p.y == gy))
-            display->fillRect((p.x - 1) * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE, fog_color);
+            drawThickBorder((p.x - 1) * CELL_SIZE, p.y * CELL_SIZE);
     }
 }
 
@@ -353,34 +365,47 @@ void GameState::renderGoal(DisplayManager* display) {
     uint8_t gx = maze.getGoalX();
     uint8_t gy = maze.getGoalY();
 
+    // Calculate minimum Manhattan distance from any active player
+    uint8_t dist1 = abs((int)players[0].x - (int)gx) + abs((int)players[0].y - (int)gy);
+    uint8_t min_dist = dist1;
+
+    if (two_player_mode) {
+        uint8_t dist2 = abs((int)players[1].x - (int)gx) + abs((int)players[1].y - (int)gy);
+        if (dist2 < min_dist) min_dist = dist2;
+    }
+
+    // Check if goal is actually reachable (not just adjacent)
     bool p1_can_reach = false;
     bool p2_can_reach = false;
 
-    // Check if Player 1 can reach goal
     if (isAdjacent(players[0], gx, gy)) {
         p1_can_reach = canReachGoal(players[0], gx, gy);
     }
-
-    // Check if Player 2 can reach goal (if in two-player mode)
     if (two_player_mode && isAdjacent(players[1], gx, gy)) {
         p2_can_reach = canReachGoal(players[1], gx, gy);
     }
 
-    // Screen position of this cell
-    int16_t sx = gx * CELL_SIZE;
-    int16_t sy = gy * CELL_SIZE;
-    int16_t half = CELL_SIZE / 2;
-
+    // Override distance to show green if actually reachable (walls don't block)
     if (p1_can_reach || p2_can_reach) {
-        // Checkerboard pattern (reachable) - 2x2 grid of half-sized squares
-        display->fillRect(sx,        sy,        half, half, GOAL_COLOR);  // Top-left
-        display->fillRect(sx + half, sy,        half, half, PATH_COLOR);  // Top-right
-        display->fillRect(sx,        sy + half, half, half, PATH_COLOR);  // Bottom-left
-        display->fillRect(sx + half, sy + half, half, half, GOAL_COLOR);  // Bottom-right
-    } else {
-        // Solid green (visible but not adjacent)
-        display->fillRect(sx, sy, CELL_SIZE, CELL_SIZE, GOAL_COLOR);
+        min_dist = 0;  // Force green color
     }
+
+    // Get color based on distance
+    uint16_t goal_color = getGoalColorForDistance(min_dist);
+
+    // Render animated doorway sprite with distance-based color
+    SpriteRenderer::drawWithColorTint(display, &goal_sprite,
+                                       gx * CELL_SIZE, gy * CELL_SIZE,
+                                       goal_color);
+}
+
+uint16_t GameState::getGoalColorForDistance(uint8_t min_distance) {
+    if (min_distance == 0) return GOAL_COLOR;           // On goal (won) - green
+    if (min_distance == 1) return GOAL_DIST_ADJACENT;   // Adjacent (reachable) - red
+    if (min_distance <= 4) return GOAL_DIST_CLOSE;      // Close - orange
+    if (min_distance <= 9) return GOAL_DIST_MEDIUM;     // Medium - yellow
+    if (min_distance <= 19) return GOAL_DIST_MED_FAR;   // Far - cyan
+    return GOAL_DIST_FAR;                                // Very far - blue
 }
 
 bool GameState::isAdjacent(const Player& p, uint8_t gx, uint8_t gy) {

@@ -50,6 +50,13 @@
 #define P2_FOG_COLOR   0x780F  // Purple (distinct from blue)
 #define ACTIVE_HIGHLIGHT 0xFFFF // White border for active player
 
+// Goal distance color progression (RGB565) - heat map style
+#define GOAL_DIST_FAR      0x001F  // Blue - very far away (>= 20 cells)
+#define GOAL_DIST_MED_FAR  0x07FF  // Cyan - far (10-19 cells)
+#define GOAL_DIST_MEDIUM   0xFFE0  // Yellow - medium distance (5-9 cells)
+#define GOAL_DIST_CLOSE    0xFD20  // Orange - close (2-4 cells)
+#define GOAL_DIST_ADJACENT 0xF800  // Red - adjacent/reachable (1 cell)
+
 // Turn indicator UI position (top-right corner)
 #define TURN_INDICATOR_X 56
 #define TURN_INDICATOR_Y 2

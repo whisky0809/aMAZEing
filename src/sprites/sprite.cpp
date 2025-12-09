@@ -47,3 +47,23 @@ void SpriteRenderer::draw(DisplayManager* display, const SpriteInstance* instanc
         }
     }
 }
+
+void SpriteRenderer::drawWithColorTint(DisplayManager* display, const SpriteInstance* instance,
+                                        int16_t x, int16_t y, uint16_t tint_color) {
+    const uint16_t* frame = getCurrentFrame(instance);
+    uint8_t w = instance->definition->width;
+    uint8_t h = instance->definition->height;
+
+    // Draw pixel by pixel, replacing non-transparent pixels with tint color
+    for (uint8_t py = 0; py < h; py++) {
+        for (uint8_t px = 0; px < w; px++) {
+            // Read pixel from PROGMEM
+            uint16_t pixel = pgm_read_word(&frame[py * w + px]);
+
+            // Replace non-transparent pixels with tint color
+            if (pixel != TRANSPARENT_COLOR) {
+                display->drawPixel(x + px, y + py, tint_color);
+            }
+        }
+    }
+}
