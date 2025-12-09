@@ -6,6 +6,7 @@
 #include <Arduino.h>
 #include "../display/display_manager.h"
 #include "maze_generator.h"
+#include "../sprites/sprite.h"
 
 enum GameMode {
     STATE_START,
@@ -17,8 +18,9 @@ enum GameMode {
 struct Player {
     uint8_t x, y;              // Position
     uint16_t color;            // Player color
-    uint8_t current_cell_dirs; // NEW: Per-player maze state (bitfield)
-    uint16_t moves;            // NEW: Per-player move counter
+    uint8_t current_cell_dirs; // Per-player maze state (bitfield)
+    uint16_t moves;            // Per-player move counter
+    SpriteInstance sprite;     // Animated sprite
 };
 
 class GameState {

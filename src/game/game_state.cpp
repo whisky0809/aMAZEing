@@ -1,6 +1,7 @@
 // game/game_state.cpp
 #include "game_state.h"
 #include "../config.h"
+#include "../sprites/player_sprites.h"
 
 GameState::GameState() {
     two_player_mode = false; // Default
@@ -56,6 +57,7 @@ void GameState::resetGame() {
     players[0].y = sy;
     players[0].color = PLAYER1_COLOR;
     players[0].moves = 0;
+    SpriteRenderer::initInstance(&players[0].sprite, &PLAYER1_SPRITE);
 
     // Generate initial directions at start
     maze.generateNewDirections(sx, sy);
@@ -93,6 +95,7 @@ void GameState::resetGame() {
         players[1].y = sy2;
         players[1].color = PLAYER2_COLOR;
         players[1].moves = 0;
+        SpriteRenderer::initInstance(&players[1].sprite, &PLAYER2_SPRITE);
 
         // Generate initial directions for Player 2
         maze.generateNewDirections(sx2, sy2);
@@ -263,7 +266,11 @@ void GameState::movePlayer(Player& p, Direction dir) {
 }
 
 void GameState::update() {
-    // Animations can go here
+    // Update sprite animations
+    SpriteRenderer::updateAnimation(&players[0].sprite);
+    if (two_player_mode) {
+        SpriteRenderer::updateAnimation(&players[1].sprite);
+    }
 }
 
 void GameState::render(DisplayManager* display) {
@@ -289,7 +296,9 @@ void GameState::renderSinglePlayer(DisplayManager* display) {
     // Re-use standard fog color (Blue/PATH_COLOR)
     renderPlayerFog(display, players[0], PATH_COLOR);
     renderGoal(display);
-    display->fillRect(players[0].x * CELL_SIZE, players[0].y * CELL_SIZE, CELL_SIZE, CELL_SIZE, players[0].color);
+    // Render player sprite
+    SpriteRenderer::draw(display, &players[0].sprite,
+                         players[0].x * CELL_SIZE, players[0].y * CELL_SIZE);
 }
 
 void GameState::renderTwoPlayer(DisplayManager* display) {
@@ -303,8 +312,10 @@ void GameState::renderTwoPlayer(DisplayManager* display) {
     renderGoal(display);
 
     // 4. Draw both players (always visible)
-    display->fillRect(players[0].x * CELL_SIZE, players[0].y * CELL_SIZE, CELL_SIZE, CELL_SIZE, players[0].color);
-    display->fillRect(players[1].x * CELL_SIZE, players[1].y * CELL_SIZE, CELL_SIZE, CELL_SIZE, players[1].color);
+    SpriteRenderer::draw(display, &players[0].sprite,
+                         players[0].x * CELL_SIZE, players[0].y * CELL_SIZE);
+    SpriteRenderer::draw(display, &players[1].sprite,
+                         players[1].x * CELL_SIZE, players[1].y * CELL_SIZE);
     
     // 5. Draw turn indicator (corner square)
     // Draw border
