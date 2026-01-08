@@ -122,6 +122,19 @@ pio run --target clean
 
 ## Game Controls
 
+### Joystick (HW-504 Module)
+
+| Input | Action |
+|-------|--------|
+| **Stick Up** | Move Up |
+| **Stick Left** | Move Left |
+| **Stick Down** | Move Down |
+| **Stick Right** | Move Right |
+| **Short Press** | Reset Game |
+| **Long Press** | Toggle 1P/2P mode (on start screen) |
+
+### Serial (Debug)
+
 Connect via serial monitor (115200 baud) and use:
 
 | Key | Action |
@@ -169,14 +182,30 @@ Connect via serial monitor (115200 baud) and use:
 - **Win Detection**: Reach the green goal pixel
 - **Move Counter**: Track efficiency via serial output
 
-### Display Colors
+### Display Colors & Visual Feedback
 
 | Color | RGB565 | Meaning |
 |-------|--------|---------|
-| Red | 0xF800 | Player position |
-| Green | 0x07E0 | Goal location |
-| Blue | 0x001F | Available paths |
-| Black | 0x0000 | Walls |
+| Red | 0xF800 | Player 1 / Blocked indicator / Goal far away |
+| Cyan | 0x07FF | Player 2 |
+| Blue | 0x001F | Available paths / Goal accessible (open door) |
+| Green | 0x07E0 | Goal close / Goal blocked (with red barrier) |
+| Orange | 0xFD20 | Goal medium distance |
+| Yellow | 0xFFE0 | Goal close distance |
+| Black | 0x0000 | Walls / Open door center |
+
+### Goal Distance Coloring (Heat Map)
+
+The goal changes color based on distance from the nearest player:
+
+| Distance | Color | Meaning |
+|----------|-------|---------|
+| ≥10 cells | Red | Far away |
+| 5-9 cells | Orange | Medium distance |
+| 2-4 cells | Yellow | Getting close |
+| 1 cell (adjacent) | Green | Almost there! |
+| Adjacent + can enter | Blue (open) | Door is open - enter now! |
+| Adjacent + blocked | Green + red line | Can't enter from this side |
 
 ---
 
@@ -248,9 +277,16 @@ Maze_game(new)/
 │   │   ├── maze_generator.cpp
 │   │   ├── game_state.h
 │   │   └── game_state.cpp
-│   └── input/
-│       ├── serial_input.h
-│       └── serial_input.cpp
+│   ├── input/
+│   │   ├── serial_input.h
+│   │   ├── serial_input.cpp
+│   │   ├── joystick_input.h
+│   │   └── joystick_input.cpp
+│   └── sprites/
+│       ├── sprite.h
+│       ├── sprite.cpp
+│       ├── player_sprites.h
+│       └── goal_sprites.h
 └── lib/
     └── RP2040Matrix/       # HUB75 display driver (PIO-based)
         ├── GFXMatrix.cpp/h
@@ -278,7 +314,8 @@ Maze_game(new)/
 - [x] Phase 5: Maze Generation
 - [x] Phase 6: Fog of War Rendering
 - [x] Phase 7: Win Condition & Polish
-- [ ] Phase 8: Joystick Support (future)
+- [x] Phase 8: Joystick Support (HW-504)
+- [x] Phase 9: Visual Feedback (distance coloring, blocked indicators)
 
 ---
 

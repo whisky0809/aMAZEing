@@ -298,10 +298,13 @@ void GameState::render(DisplayManager* display) {
 }
 
 void GameState::renderSinglePlayer(DisplayManager* display) {
-    // Re-use standard fog color (Blue/PATH_COLOR)
+    // 1. Render fog (blue borders for accessible cells)
     renderPlayerFog(display, players[0], PATH_COLOR);
+    // 2. Render blocked indicators (red lines on blocked cells)
+    renderBlockedDirections(display, players[0]);
+    // 3. Render goal
     renderGoal(display);
-    // Render player sprite
+    // 4. Render player sprite
     SpriteRenderer::draw(display, &players[0].sprite,
                          players[0].x * CELL_SIZE, players[0].y * CELL_SIZE);
 }
@@ -309,23 +312,25 @@ void GameState::renderSinglePlayer(DisplayManager* display) {
 void GameState::renderTwoPlayer(DisplayManager* display) {
     // 1. Render Player 1's fog-of-war (blue)
     renderPlayerFog(display, players[0], P1_FOG_COLOR);
+    // 2. Render Player 1's blocked indicators
+    renderBlockedDirections(display, players[0]);
 
-    // 2. Render Player 2's fog-of-war (purple)
+    // 3. Render Player 2's fog-of-war (purple)
     renderPlayerFog(display, players[1], P2_FOG_COLOR);
+    // 4. Render Player 2's blocked indicators
+    renderBlockedDirections(display, players[1]);
 
-    // 3. Draw goal (always visible, shared)
+    // 5. Draw goal (always visible, shared)
     renderGoal(display);
 
-    // 4. Draw both players (always visible)
+    // 6. Draw both players (always visible)
     SpriteRenderer::draw(display, &players[0].sprite,
                          players[0].x * CELL_SIZE, players[0].y * CELL_SIZE);
     SpriteRenderer::draw(display, &players[1].sprite,
                          players[1].x * CELL_SIZE, players[1].y * CELL_SIZE);
-    
-    // 5. Draw turn indicator (corner square)
-    // Draw border
+
+    // 7. Draw turn indicator (corner square)
     display->drawRect(TURN_INDICATOR_X - 1, TURN_INDICATOR_Y - 1, 6, 6, ACTIVE_HIGHLIGHT);
-    // Draw inner color
     display->fillRect(TURN_INDICATOR_X, TURN_INDICATOR_Y, 4, 4,
                       players[active_player].color);
 }
@@ -361,51 +366,116 @@ void GameState::renderPlayerFog(DisplayManager* display, const Player& p, uint16
     }
 }
 
-void GameState::renderGoal(DisplayManager* display) {
+void GameState::renderBlockedDirections(DisplayManager* display, const Player& p) {
+    uint8_t dirs = p.current_cell_dirs;
     uint8_t gx = maze.getGoalX();
     uint8_t gy = maze.getGoalY();
 
-    // Calculate minimum Manhattan distance from any active player
+    // For each direction: if cell exists but direction blocked, draw red line
+    // on the NEIGHBOR cell's edge facing the player
+
+    // NORTH neighbor - draw red line on ITS bottom edge (facing player)
+    if (p.y > 0 && !(dirs & (1 << NORTH))) {
+        int16_t nx = p.x * CELL_SIZE;
+        int16_t ny = (p.y - 1) * CELL_SIZE;
+        // Skip if this is the goal cell (handled separately)
+        if (!(p.x == gx && p.y - 1 == gy)) {
+            display->fillRect(nx, ny + CELL_SIZE - 2, CELL_SIZE, 2, BLOCKED_COLOR);
+        }
+    }
+
+    // SOUTH neighbor - draw red line on ITS top edge (facing player)
+    if (p.y < MAZE_SIZE - 1 && !(dirs & (1 << SOUTH))) {
+        int16_t nx = p.x * CELL_SIZE;
+        int16_t ny = (p.y + 1) * CELL_SIZE;
+        if (!(p.x == gx && p.y + 1 == gy)) {
+            display->fillRect(nx, ny, CELL_SIZE, 2, BLOCKED_COLOR);
+        }
+    }
+
+    // EAST neighbor - draw red line on ITS left edge (facing player)
+    if (p.x < MAZE_SIZE - 1 && !(dirs & (1 << EAST))) {
+        int16_t nx = (p.x + 1) * CELL_SIZE;
+        int16_t ny = p.y * CELL_SIZE;
+        if (!(p.x + 1 == gx && p.y == gy)) {
+            display->fillRect(nx, ny, 2, CELL_SIZE, BLOCKED_COLOR);
+        }
+    }
+
+    // WEST neighbor - draw red line on ITS right edge (facing player)
+    if (p.x > 0 && !(dirs & (1 << WEST))) {
+        int16_t nx = (p.x - 1) * CELL_SIZE;
+        int16_t ny = p.y * CELL_SIZE;
+        if (!(p.x - 1 == gx && p.y == gy)) {
+            display->fillRect(nx + CELL_SIZE - 2, ny, 2, CELL_SIZE, BLOCKED_COLOR);
+        }
+    }
+}
+
+void GameState::drawGoalBarrier(DisplayManager* display, uint8_t gx, uint8_t gy, const Player& p) {
+    int16_t gpx = gx * CELL_SIZE;
+    int16_t gpy = gy * CELL_SIZE;
+
+    // Draw red barrier on the goal cell edge facing the player
+    if (p.x < gx) {  // Player is WEST of goal -> barrier on goal's LEFT edge
+        display->fillRect(gpx, gpy, 2, CELL_SIZE, BLOCKED_COLOR);
+    } else if (p.x > gx) {  // Player is EAST of goal -> barrier on goal's RIGHT edge
+        display->fillRect(gpx + CELL_SIZE - 2, gpy, 2, CELL_SIZE, BLOCKED_COLOR);
+    } else if (p.y < gy) {  // Player is NORTH of goal -> barrier on goal's TOP edge
+        display->fillRect(gpx, gpy, CELL_SIZE, 2, BLOCKED_COLOR);
+    } else if (p.y > gy) {  // Player is SOUTH of goal -> barrier on goal's BOTTOM edge
+        display->fillRect(gpx, gpy + CELL_SIZE - 2, CELL_SIZE, 2, BLOCKED_COLOR);
+    }
+}
+
+void GameState::renderGoal(DisplayManager* display) {
+    uint8_t gx = maze.getGoalX();
+    uint8_t gy = maze.getGoalY();
+    int16_t gpx = gx * CELL_SIZE;
+    int16_t gpy = gy * CELL_SIZE;
+
+    // Calculate distance for color
     uint8_t dist1 = abs((int)players[0].x - (int)gx) + abs((int)players[0].y - (int)gy);
     uint8_t min_dist = dist1;
-
     if (two_player_mode) {
         uint8_t dist2 = abs((int)players[1].x - (int)gx) + abs((int)players[1].y - (int)gy);
         if (dist2 < min_dist) min_dist = dist2;
     }
 
-    // Check if goal is actually reachable (not just adjacent)
-    bool p1_can_reach = false;
-    bool p2_can_reach = false;
+    // Check adjacency and reachability for each player
+    bool p1_adjacent = isAdjacent(players[0], gx, gy);
+    bool p2_adjacent = two_player_mode && isAdjacent(players[1], gx, gy);
+    bool p1_can_reach = p1_adjacent && canReachGoal(players[0], gx, gy);
+    bool p2_can_reach = p2_adjacent && canReachGoal(players[1], gx, gy);
 
-    if (isAdjacent(players[0], gx, gy)) {
-        p1_can_reach = canReachGoal(players[0], gx, gy);
-    }
-    if (two_player_mode && isAdjacent(players[1], gx, gy)) {
-        p2_can_reach = canReachGoal(players[1], gx, gy);
-    }
-
-    // Override distance to show green if actually reachable (walls don't block)
     if (p1_can_reach || p2_can_reach) {
-        min_dist = 0;  // Force green color
+        // ACCESSIBLE: Blue door with center 4x4 black ("open" look)
+        SpriteRenderer::drawWithColorTint(display, &goal_sprite, gpx, gpy, GOAL_ACCESSIBLE);
+        // Clear center 4x4 to black (makes door look "open")
+        display->fillRect(gpx + 2, gpy + 2, 4, 4, 0x0000);
+    } else if (p1_adjacent || p2_adjacent) {
+        // ADJACENT BUT BLOCKED: Green door + red barrier line
+        SpriteRenderer::drawWithColorTint(display, &goal_sprite, gpx, gpy, GOAL_COLOR);
+        // Draw barrier for whichever player is adjacent but blocked
+        if (p1_adjacent && !p1_can_reach) {
+            drawGoalBarrier(display, gx, gy, players[0]);
+        }
+        if (p2_adjacent && !p2_can_reach) {
+            drawGoalBarrier(display, gx, gy, players[1]);
+        }
+    } else {
+        // NOT ADJACENT: Normal distance-based coloring
+        uint16_t goal_color = getGoalColorForDistance(min_dist);
+        SpriteRenderer::drawWithColorTint(display, &goal_sprite, gpx, gpy, goal_color);
     }
-
-    // Get color based on distance
-    uint16_t goal_color = getGoalColorForDistance(min_dist);
-
-    // Render animated doorway sprite with distance-based color
-    SpriteRenderer::drawWithColorTint(display, &goal_sprite,
-                                       gx * CELL_SIZE, gy * CELL_SIZE,
-                                       goal_color);
 }
 
 uint16_t GameState::getGoalColorForDistance(uint8_t min_distance) {
     if (min_distance == 0) return GOAL_COLOR;           // On goal (won) - green
-    if (min_distance == 1) return GOAL_DIST_ADJACENT;   // Adjacent (reachable) - red
-    if (min_distance <= 4) return GOAL_DIST_CLOSE;      // Close - orange
-    if (min_distance <= 9) return GOAL_DIST_MEDIUM;     // Medium - yellow
-    if (min_distance <= 19) return GOAL_DIST_MED_FAR;   // Far - cyan
-    return GOAL_DIST_FAR;                                // Very far - blue
+    if (min_distance == 1) return GOAL_DIST_ADJACENT;   // Adjacent - green
+    if (min_distance <= 4) return GOAL_DIST_CLOSE;      // Close - yellow
+    if (min_distance <= 9) return GOAL_DIST_MEDIUM;     // Medium - orange
+    return GOAL_DIST_FAR;                                // Far (≥10) - red
 }
 
 bool GameState::isAdjacent(const Player& p, uint8_t gx, uint8_t gy) {

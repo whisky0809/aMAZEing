@@ -29,7 +29,9 @@ This is a PlatformIO-based Arduino project for Raspberry Pi Pico targeting a 64x
 - **src/display/display_manager** - Abstraction layer over GFXMatrix library, wraps Adafruit_GFX
 - **src/game/game_state** - State machine (START/PLAYING/WIN), handles 1P/2P modes, player movement, and rendering
 - **src/game/maze_generator** - Procedural maze using seeded random directions (memoryless design - no grid storage)
-- **src/input/serial_input** - WASD command parser over USB serial
+- **src/input/serial_input** - WASD command parser over USB serial (debug/backup)
+- **src/input/joystick_input** - HW-504 analog joystick with debouncing and button handling
+- **src/sprites/** - Animated sprite system with PROGMEM storage and color tinting
 
 ### Display Library
 
@@ -47,8 +49,13 @@ This is a PlatformIO-based Arduino project for Raspberry Pi Pico targeting a 64x
 ### Color Format
 
 All colors use RGB565 format (16-bit). Key colors defined in config.h:
-- PLAYER_COLOR (0xF800 red), GOAL_COLOR (0x07E0 green), PATH_COLOR (0x001F blue)
+- **Players:** PLAYER1_COLOR (0xF800 red), PLAYER2_COLOR (0x07FF cyan)
+- **Paths:** PATH_COLOR (0x001F blue) for accessible, BLOCKED_COLOR (0xF800 red) for blocked
+- **Goal distance (heat map):** Red (far) → Orange → Yellow → Green (close)
+- **Goal accessibility:** GOAL_ACCESSIBLE (0x001F blue, open door), GOAL_COLOR (0x07E0 green, blocked)
 
 ## Game Controls
 
-Serial input (115200 baud): W/A/S/D movement, R reset, T toggle 1P/2P mode (on start screen)
+**Joystick (HW-504):** Stick for movement, short press to reset, long press to toggle mode
+
+**Serial (115200 baud):** W/A/S/D movement, R reset, T toggle 1P/2P mode (on start screen)

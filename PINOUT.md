@@ -34,14 +34,20 @@ Connect the HUB75 ribbon cable to the Pico pins as follows.
 *   **VCC (Display):** Connect directly to 5V PSU. **DO NOT power the display through the Pico.**
 *   **GND:** Common Ground between Pico, Display, and PSU is **mandatory**.
 
-### Input Controls (Future Upgrade)
-These pins are reserved in the code for joystick support.
+### Joystick Input (HW-504 Module)
 
-| Signal | Component | Pico Pin | Type |
-|--------|-----------|----------|------|
-| **VRx**| Joystick X| **GP26** | ADC0 |
-| **VRy**| Joystick Y| **GP27** | ADC1 |
-| **SW** | Switch    | **GP22** | Digital Input (Pull-up) |
+| Signal | Component | Pico Pin | Type | Notes |
+|--------|-----------|----------|------|-------|
+| **VRx**| Joystick X| **GP26** | ADC0 | 10-bit ADC (0-1023), center ~512 |
+| **VRy**| Joystick Y| **GP27** | ADC1 | 10-bit ADC (0-1023), center ~512 |
+| **SW** | Button    | **GP22** | Digital Input (Pull-up) | Active LOW |
+| **+5V**| Power     | **3V3**  | Power | Use 3.3V for Pico ADC safety |
+| **GND**| Ground    | **GND**  | Ground | Common ground |
+
+**Joystick Controls:**
+- Stick movement: Navigate maze (with 150ms debounce)
+- Short press: Reset game
+- Long press (500ms): Toggle 1P/2P mode (on start screen only)
 
 ## Troubleshooting
 *   **Ghosting:** If you see vertical smearing, try lowering brightness in code or checking your Ground connections.

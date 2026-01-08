@@ -44,7 +44,9 @@ private:
     void renderSinglePlayer(DisplayManager* display);
     void renderTwoPlayer(DisplayManager* display);
     void renderPlayerFog(DisplayManager* display, const Player& p, uint16_t fog_color);
+    void renderBlockedDirections(DisplayManager* display, const Player& p);
     void renderGoal(DisplayManager* display);
+    void drawGoalBarrier(DisplayManager* display, uint8_t gx, uint8_t gy, const Player& p);
     void renderStartScreen(DisplayManager* display);
     void renderWinScreen(DisplayManager* display);
     bool isAdjacent(const Player& p, uint8_t gx, uint8_t gy);
