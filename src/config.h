@@ -19,18 +19,22 @@
 // Control pins (must be consecutive):
 //   GP11 = LATCH, GP12 = OE (Output Enable), GP13 = CLK (Clock)
 
-// Joystick Pins (HW-504 module)
-#define JOY_X_PIN    26  // ADC0
-#define JOY_Y_PIN    27  // ADC1
-#define JOY_BTN_PIN  22  // Button (active LOW)
+// UART pins for R4 communication
+#define UART_RX_PIN  17      // GP17 receives from R4 TX (pin 1)
+#define UART_BAUD    115200
 
-// Joystick ADC thresholds (10-bit ADC: 0-1023, center ~512)
-#define JOY_CENTER       512    // ADC center value
-#define JOY_CENTER_MIN   400    // Dead zone lower bound
-#define JOY_CENTER_MAX   624    // Dead zone upper bound
-#define JOY_DEBOUNCE_MS  150    // Minimum ms between direction inputs
-#define JOY_BTN_DEBOUNCE 50     // Button debounce time (ms)
-#define JOY_LONG_PRESS   500    // Long press threshold for mode toggle (ms)
+// R4 binary packet protocol
+#define UART_HEADER_0   0xAA
+#define UART_HEADER_1   0x55
+#define UART_PACKET_LEN 8
+
+// Joystick thresholds (raw ADC 0-1023, center ~512)
+#define JOY_CENTER      512
+#define JOY_DEADZONE    100  // Must exceed this from center to register direction
+
+// Button mask bits in packet byte 6
+#define BTN_MASK_JSW    (1 << 0)  // Joystick switch
+#define BTN_MASK_MAIN   (1 << 1)  // Main button
 
 // Game Constants - RGB565 color format
 #define PLAYER_COLOR   0xF800  // Red

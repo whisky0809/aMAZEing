@@ -5,13 +5,13 @@
 #include "display/display_manager.h"
 #include "game/game_state.h"
 #include "input/serial_input.h"
-#include "input/joystick_input.h"
+#include "input/uart_input.h"
 
 // Game objects
 DisplayManager display;
 GameState game;
 SerialInput serial_input;
-JoystickInput joystick_input;
+UARTInput uart_input;
 
 void setup() {
     // Initialize serial communication
@@ -39,10 +39,10 @@ void setup() {
     randomSeed(analogRead(28));
     Serial.println("Random seed initialized");
 
-    // Initialize joystick input
-    Serial.println("Initializing joystick...");
-    joystick_input.init();
-    Serial.println("Joystick initialized (GP26=X, GP27=Y, GP22=BTN)");
+    // Initialize UART input from R4 controller
+    Serial.println("Initializing UART input...");
+    uart_input.init();
+    Serial.println("UART initialized (GP17=RX, 115200 baud, binary protocol)");
 
     // Initialize game
     Serial.println("Initializing game state...");
@@ -52,30 +52,30 @@ void setup() {
     Serial.println("========================================");
     Serial.println("         GAME STARTED!");
     Serial.println("========================================");
-    Serial.println("Controls:");
+    Serial.println("Controls (R4 Joystick via UART):");
     Serial.println("  Joystick: Move in any direction");
     Serial.println("  Button short press: Reset Game");
     Serial.println("  Button long press: Toggle Mode");
-    Serial.println("  --- Serial Backup ---");
+    Serial.println("  --- USB Serial Backup ---");
     Serial.println("  W/A/S/D = Move, R = Reset, T = Mode");
     Serial.println("========================================");
     Serial.println();
 }
 
 void loop() {
-    // Poll BOTH input sources (joystick has priority if both active)
+    // Poll BOTH input sources (UART has priority if both active)
     Direction serial_dir = serial_input.getCommand();
-    Direction joy_dir = joystick_input.getCommand();
+    Direction uart_dir = uart_input.getCommand();
 
-    // Use joystick input if available, otherwise serial
-    Direction dir = (joy_dir != DIR_NONE) ? joy_dir : serial_dir;
+    // Use UART input if available, otherwise USB serial
+    Direction dir = (uart_dir != DIR_NONE) ? uart_dir : serial_dir;
 
     if (dir != DIR_NONE) {
         game.handleInput(dir);
     }
 
     // Check for reset request from either source
-    if (serial_input.isResetRequested() || joystick_input.isResetRequested()) {
+    if (serial_input.isResetRequested() || uart_input.isResetRequested()) {
         Serial.println();
         Serial.println("========================================");
         Serial.println("         GAME RESET");
@@ -86,7 +86,7 @@ void loop() {
 
     // Handle mode toggle from either source
     bool toggle_requested = serial_input.isToggleModeRequested() ||
-                            joystick_input.isToggleModeRequested();
+                            uart_input.isToggleModeRequested();
     if (toggle_requested && game.isStartScreen()) {
         static bool two_player = false;
         two_player = !two_player;
