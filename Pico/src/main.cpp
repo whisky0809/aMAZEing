@@ -55,9 +55,9 @@ void setup() {
     Serial.println("Controls (R4 Joystick via UART):");
     Serial.println("  Joystick: Move in any direction");
     Serial.println("  Button short press: Reset Game");
-    Serial.println("  Button long press: Toggle Mode");
     Serial.println("  --- USB Serial Backup ---");
-    Serial.println("  W/A/S/D = Move, R = Reset, T = Mode");
+    Serial.println("  U/H/J/K = Move, R = Reset");
+    Serial.println("  (U=Up, H=Left, J=Down, K=Right)");
     Serial.println("========================================");
     Serial.println();
 }
@@ -72,31 +72,38 @@ void loop() {
 
     if (dir != DIR_NONE) {
         game.handleInput(dir);
+
+        // Send response to R4 controller
+        MoveResult res = game.getLastMoveResult();
+        if (res == MOVE_VALID) {
+            Serial1.write('V');
+        } else if (res == MOVE_INVALID) {
+            Serial1.write('I');
+        } else if (res == MOVE_WIN) {
+            Serial1.write('W');
+            Serial.println("[GAME] Win!");
+        }
     }
 
     // Check for reset request from either source
     if (serial_input.isResetRequested() || uart_input.isResetRequested()) {
-        Serial.println();
-        Serial.println("========================================");
-        Serial.println("         GAME RESET");
-        Serial.println("========================================");
+        Serial.println("[GAME] Reset");
         game.init();
-        Serial.println();
     }
 
-    // Handle mode toggle from either source
-    bool toggle_requested = serial_input.isToggleModeRequested() ||
-                            uart_input.isToggleModeRequested();
-    if (toggle_requested && game.isStartScreen()) {
-        static bool two_player = false;
-        two_player = !two_player;
-        game.setTwoPlayerMode(two_player);
-        Serial.println("========================================");
-        Serial.print("  Two-player mode: ");
-        Serial.println(two_player ? "ON" : "OFF");
-        Serial.println("========================================");
-        game.init();  // Restart with new mode
-    }
+    // Mode toggle disabled - always 2-player mode
+    // bool toggle_requested = serial_input.isToggleModeRequested() ||
+    //                         uart_input.isToggleModeRequested();
+    // if (toggle_requested && game.isStartScreen()) {
+    //     static bool two_player = false;
+    //     two_player = !two_player;
+    //     game.setTwoPlayerMode(two_player);
+    //     Serial.println("========================================");
+    //     Serial.print("  Two-player mode: ");
+    //     Serial.println(two_player ? "ON" : "OFF");
+    //     Serial.println("========================================");
+    //     game.init();  // Restart with new mode
+    // }
 
     // Update game logic
     game.update();

@@ -14,7 +14,7 @@ private:
 
     // One-shot command flags
     bool reset_requested;
-    bool mode_toggle_requested;
+    // bool mode_toggle_requested;  // Disabled - 2-player only
 
     // Direction debouncing
     Direction last_direction;
@@ -32,7 +32,7 @@ public:
     void init();
     Direction getCommand();
     bool isResetRequested();
-    bool isToggleModeRequested();
+    // bool isToggleModeRequested();  // Disabled - 2-player only
 };
 
 #endif // UART_INPUT_H

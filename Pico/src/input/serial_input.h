@@ -9,13 +9,13 @@
 class SerialInput {
 private:
     bool reset_requested;
-    bool mode_toggle_requested;  // NEW
+    // bool mode_toggle_requested;  // Disabled - 2-player only
 
 public:
     SerialInput();
     Direction getCommand();
     bool isResetRequested();
-    bool isToggleModeRequested();  // NEW
+    // bool isToggleModeRequested();  // Disabled - 2-player only
 };
 
 #endif // SERIAL_INPUT_H

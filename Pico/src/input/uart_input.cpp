@@ -2,29 +2,39 @@
 #include "uart_input.h"
 
 // Debounce time between direction changes (ms)
-static const unsigned long DIRECTION_DEBOUNCE_MS = 150;
+// 150ms can feel a bit slow; 110ms is snappier but still stable
+static const unsigned long DIRECTION_DEBOUNCE_MS = 110;
+
+// Debug levels: 0 = off, 1 = important events only, 2 = verbose (every packet)
+#define UART_DEBUG_LEVEL 1
 
 UARTInput::UARTInput()
     : packet_idx(0)
     , reset_requested(false)
-    , mode_toggle_requested(false)
+    // , mode_toggle_requested(false)  // Disabled - always 2-player
     , last_direction(DIR_NONE)
     , last_direction_time(0)
 {
 }
 
 void UARTInput::init() {
-    Serial2.setRX(UART_RX_PIN);
-    Serial2.begin(UART_BAUD);
+    // You are using GP16 (TX) and GP17 (RX) on Pico W.
+    // Those pins are UART0 alternate pins -> use Serial1 (UART0).
+    Serial1.setTX(UART_TX_PIN);   // GP16
+    Serial1.setRX(UART_RX_PIN);   // GP17
+    Serial1.begin(UART_BAUD);
+
+#if UART_DEBUG_LEVEL >= 1
+    Serial.println("[UART] Init: GP16/GP17, 115200 baud");
+#endif
 }
 
 Direction UARTInput::rawToDirection(uint16_t x, uint16_t y) {
-    // Convert raw ADC values (0-1023) to direction
-    // Center is ~512, apply deadzone
+    // Raw values from R4 are 0..1023
+    // Center around ~512 then apply deadzone
     int dx = (int)x - JOY_CENTER;
     int dy = (int)y - JOY_CENTER;
 
-    // Check if outside deadzone
     bool x_active = (abs(dx) > JOY_DEADZONE);
     bool y_active = (abs(dy) > JOY_DEADZONE);
 
@@ -32,16 +42,17 @@ Direction UARTInput::rawToDirection(uint16_t x, uint16_t y) {
         return DIR_NONE;
     }
 
-    // Determine dominant axis
+    // Choose dominant axis
     if (abs(dy) > abs(dx)) {
         // Y axis dominant
-        // Note: R4 inverts Y so pushing up sends negative values
-        if (dy < 0) return NORTH;  // Up
-        else return SOUTH;         // Down
+        // IMPORTANT:
+        // With typical joystick wiring, pushing UP usually makes ADC value go DOWN (dy < 0).
+        if (dy < 0) return NORTH;
+        else        return SOUTH;
     } else {
         // X axis dominant
-        if (dx < 0) return WEST;   // Left
-        else return EAST;          // Right
+        if (dx < 0) return WEST;
+        else        return EAST;
     }
 }
 
@@ -56,27 +67,24 @@ bool UARTInput::parsePacket() {
     for (int i = 0; i < 7; i++) {
         checksum ^= packet_buf[i];
     }
-    if (checksum != packet_buf[7]) {
-        return false;
-    }
-
-    return true;
+    return (checksum == packet_buf[7]);
 }
 
 Direction UARTInput::getCommand() {
     Direction result = DIR_NONE;
     unsigned long now = millis();
 
-    while (Serial2.available()) {
-        uint8_t byte = Serial2.read();
+    // READ FROM Serial1 (UART0) because GP16/GP17 are UART0 pins.
+    while (Serial1.available()) {
+        uint8_t byte = (uint8_t)Serial1.read();
 
-        // Handle single-char button events (R/T) sent by R4
+        // Handle single-char events from R4 (only when we're not mid-packet)
         if (packet_idx == 0) {
             if (byte == 'R') {
+#if UART_DEBUG_LEVEL >= 1
+                Serial.println("[UART] Reset command");
+#endif
                 reset_requested = true;
-                continue;
-            } else if (byte == 'T') {
-                mode_toggle_requested = true;
                 continue;
             }
         }
@@ -95,35 +103,49 @@ Direction UARTInput::getCommand() {
                 // Could be start of new packet, stay at idx 1
                 packet_buf[0] = byte;
             } else {
-                // Invalid, reset
                 packet_idx = 0;
             }
         } else {
-            // Collecting payload bytes
+            // Collect payload bytes
             packet_buf[packet_idx++] = byte;
 
             if (packet_idx >= UART_PACKET_LEN) {
                 // Full packet received
                 if (parsePacket()) {
                     // Extract joystick values (little-endian)
-                    uint16_t rawX = packet_buf[2] | (packet_buf[3] << 8);
-                    uint16_t rawY = packet_buf[4] | (packet_buf[5] << 8);
-                    // uint8_t btnMask = packet_buf[6];  // Available if needed
+                    uint16_t rawX = (uint16_t)packet_buf[2] | ((uint16_t)packet_buf[3] << 8);
+                    uint16_t rawY = (uint16_t)packet_buf[4] | ((uint16_t)packet_buf[5] << 8);
 
                     Direction dir = rawToDirection(rawX, rawY);
 
-                    // Apply debouncing
+                    // Debouncing: only output a direction if it's new
+                    // OR enough time has passed holding that direction
                     if (dir != DIR_NONE) {
                         if (dir != last_direction || (now - last_direction_time >= DIRECTION_DEBOUNCE_MS)) {
                             result = dir;
                             last_direction = dir;
                             last_direction_time = now;
+#if UART_DEBUG_LEVEL >= 1
+                            // Only log when direction is accepted
+                            const char* dirName = (dir == NORTH) ? "N" :
+                                                  (dir == SOUTH) ? "S" :
+                                                  (dir == EAST) ? "E" : "W";
+                            Serial.print("[UART] Dir: ");
+                            Serial.println(dirName);
+#endif
                         }
                     } else {
-                        // Joystick returned to center, allow immediate next input
+                        // Returned to center: allow immediate next direction
                         last_direction = DIR_NONE;
                     }
                 }
+#if UART_DEBUG_LEVEL >= 2
+                else {
+                    Serial.println("[UART] Bad checksum");
+                }
+#endif
+
+                // Reset packet state
                 packet_idx = 0;
             }
         }
@@ -140,10 +162,11 @@ bool UARTInput::isResetRequested() {
     return false;
 }
 
-bool UARTInput::isToggleModeRequested() {
-    if (mode_toggle_requested) {
-        mode_toggle_requested = false;
-        return true;
-    }
-    return false;
-}
+// Disabled - always 2-player mode
+// bool UARTInput::isToggleModeRequested() {
+//     if (mode_toggle_requested) {
+//         mode_toggle_requested = false;
+//         return true;
+//     }
+//     return false;
+// }

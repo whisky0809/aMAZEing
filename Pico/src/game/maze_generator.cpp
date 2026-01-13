@@ -7,15 +7,13 @@ void MazeGenerator::init() {
     current_cell_dirs = 0;
     
     // Default goal (will be overwritten by GameState)
-    goal_x = MAZE_SIZE - 1;
-    goal_y = MAZE_SIZE - 1;
+    goal_x = MAZE_WIDTH - 1;
+    goal_y = MAZE_HEIGHT - 1;
 
     // Pick a random seed for this maze instance
     // This ensures the maze is consistent (deterministic) for all players
     // during a single game session, but different between resets.
     maze_seed = random(1000000);
-
-    Serial.println("MazeGenerator simplified init complete.");
 }
 
 uint8_t MazeGenerator::getCurrentDirections() {
@@ -87,8 +85,8 @@ bool MazeGenerator::isGoal(uint8_t x, uint8_t y) {
 bool MazeGenerator::isOutOfBounds(uint8_t x, uint8_t y, Direction dir) {
     switch (dir) {
         case NORTH: return (y == 0);
-        case SOUTH: return (y >= MAZE_SIZE - 1);
-        case EAST:  return (x >= MAZE_SIZE - 1);
+        case SOUTH: return (y >= MAZE_HEIGHT - 1);
+        case EAST:  return (x >= MAZE_WIDTH - 1);
         case WEST:  return (x == 0);
         default:    return true;
     }

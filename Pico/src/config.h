@@ -3,7 +3,7 @@
 #define CONFIG_H
 
 // Debug mode - uncomment to enable verbose serial output
-#define DEBUG_MODE
+// #define DEBUG_MODE
 
 // Matrix dimensions
 #define MATRIX_WIDTH  64
@@ -19,8 +19,9 @@
 // Control pins (must be consecutive):
 //   GP11 = LATCH, GP12 = OE (Output Enable), GP13 = CLK (Clock)
 
-// UART pins for R4 communication
-#define UART_RX_PIN  17      // GP17 receives from R4 TX (pin 1)
+// UART pins for R4 communication (UART0 on GP16/GP17)
+#define UART_TX_PIN  16      // GP16 (optional, for sending back to R4)
+#define UART_RX_PIN  17      // GP17 receives from R4 TX
 #define UART_BAUD    115200
 
 // R4 binary packet protocol
@@ -48,10 +49,12 @@
 #define CELL_SIZE      8
 
 // Maze dimensions (derived from display size)
-#ifdef MAZE_SIZE
-#undef MAZE_SIZE
-#endif
-#define MAZE_SIZE      (MATRIX_WIDTH / CELL_SIZE)  // 64/8 = 8 cells
+#define STATUS_BAR_HEIGHT 8
+#define MAZE_OFFSET_Y     8
+
+#define MAZE_WIDTH        (MATRIX_WIDTH / CELL_SIZE)   // 64/8 = 8 cells
+#define MAZE_HEIGHT       7                            // 7 cells (56 pixels high)
+
 #define START_X        0
 #define START_Y        0
 
@@ -86,7 +89,7 @@
 #define TEXT_MODE_2P        "2 PLAYER"
 #define TEXT_TOGGLE_BTN     "T: MODE"
 
-#define TEXT_PRESS_KEY      "WASD=START"
+#define TEXT_PRESS_KEY      "PRESS A+JOY"
 #define TEXT_TO_START       "TO START"
 #define TEXT_YOU_WIN        "YOU WIN!"
 #define TEXT_MOVES_LABEL    "MOVES:"

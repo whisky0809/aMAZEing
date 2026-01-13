@@ -3,7 +3,7 @@
 
 SerialInput::SerialInput() {
     reset_requested = false;
-    mode_toggle_requested = false;  // NEW
+    // mode_toggle_requested = false;  // Disabled - always 2-player
 }
 
 Direction SerialInput::getCommand() {
@@ -18,22 +18,22 @@ Direction SerialInput::getCommand() {
         Serial.read();
     }
 
-    // Parse command
+    // Parse command - UHJK controls (U=up, H=left, J=down, K=right)
     switch (cmd) {
-        case 'W':
+        case 'U':
             return NORTH;
-        case 'A':
+        case 'H':
             return WEST;
-        case 'S':
+        case 'J':
             return SOUTH;
-        case 'D':
+        case 'K':
             return EAST;
         case 'R':
             reset_requested = true;
             return DIR_NONE;
-        case 'T':  // NEW: Toggle two-player mode
-            mode_toggle_requested = true;
-            return DIR_NONE;
+        // case 'T':  // Disabled - always 2-player mode
+        //     mode_toggle_requested = true;
+        //     return DIR_NONE;
         default:
             return DIR_NONE;
     }
@@ -47,10 +47,11 @@ bool SerialInput::isResetRequested() {
     return false;
 }
 
-bool SerialInput::isToggleModeRequested() {
-    if (mode_toggle_requested) {
-        mode_toggle_requested = false;
-        return true;
-    }
-    return false;
-}
+// Disabled - always 2-player mode
+// bool SerialInput::isToggleModeRequested() {
+//     if (mode_toggle_requested) {
+//         mode_toggle_requested = false;
+//         return true;
+//     }
+//     return false;
+// }

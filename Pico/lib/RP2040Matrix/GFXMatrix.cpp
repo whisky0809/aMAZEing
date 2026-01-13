@@ -28,10 +28,15 @@ void GFXMatrix::begin() {
 void GFXMatrix::clear()
 {
     memset(buffer, 0, WIDTH*HEIGHT*sizeof(uint32_t));
+    memset(overlay_buffer, 0, WIDTH*HEIGHT*sizeof(uint8_t));
 }
 
 void GFXMatrix::drawPixel(int16_t x, int16_t y, uint16_t color)
 {
+    // Bounds checking to prevent memory corruption
+    if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT) {
+        return;
+    }
     buffer[x + y*WIDTH] = LEDmx_565toRGB(color);
 }
 

@@ -14,6 +14,14 @@ enum GameMode {
     STATE_WIN
 };
 
+// Move result for R4 acknowledgment
+enum MoveResult {
+    MOVE_NONE,      // No move attempted yet
+    MOVE_VALID,     // Valid move executed
+    MOVE_INVALID,   // Invalid move (wall/boundary)
+    MOVE_WIN        // Player reached goal
+};
+
 // Player data structure
 struct Player {
     uint8_t x, y;              // Position
@@ -32,16 +40,15 @@ private:
 
     uint8_t active_player;     // 0 or 1 (whose turn)
     uint8_t winner;            // 0, 1, or 255 (no winner)
-    bool two_player_mode;      // Mode toggle flag
+    MoveResult lastMoveResult; // Result of last move attempt
 
     void resetGame();
 
     // Internal helpers
-    void handleSinglePlayerMove(Direction dir);
     void handleTwoPlayerMove(Direction dir);
     bool isValidMove(const Player& p, Direction dir);
     void movePlayer(Player& p, Direction dir);
-    void renderSinglePlayer(DisplayManager* display);
+    void renderStatusBar(DisplayManager* display);
     void renderTwoPlayer(DisplayManager* display);
     void renderPlayerFog(DisplayManager* display, const Player& p, uint16_t fog_color);
     void renderBlockedDirections(DisplayManager* display, const Player& p);
@@ -59,12 +66,13 @@ public:
     void handleInput(Direction dir);
     void update();
     void render(DisplayManager* display);
-    // bool checkWin(); // Removed in favor of state transition logic inside handlers
-    
-    void setTwoPlayerMode(bool enable);
+
     uint8_t getActivePlayer();
     uint16_t getPlayerMoves(uint8_t player_id);
     bool isStartScreen() { return state == STATE_START; }
+
+    // Move result for R4 communication
+    MoveResult getLastMoveResult();
 };
 
 #endif // GAME_STATE_H

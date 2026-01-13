@@ -5,21 +5,22 @@
 #include "../sprites/goal_sprites.h"
 
 GameState::GameState() {
-    two_player_mode = false; // Default
+    // two_player_mode = false; // Disabled - always 2-player
     active_player = 0;
     winner = 255;
     state = STATE_START;
+    lastMoveResult = MOVE_NONE;
 }
 
 void GameState::init() {
     state = STATE_START;
-    // two_player_mode preserved from constructor or previous setTwoPlayerMode call
-    Serial.println("Game initialized. State: START");
+    lastMoveResult = MOVE_NONE;  // Clear any stale move result
 }
 
-void GameState::setTwoPlayerMode(bool enable) {
-    two_player_mode = enable;
-}
+// Disabled - always 2-player mode
+// void GameState::setTwoPlayerMode(bool enable) {
+//     two_player_mode = enable;
+// }
 
 uint8_t GameState::getActivePlayer() {
     return active_player;
@@ -43,8 +44,8 @@ void GameState::resetGame() {
     #endif
 
     // Randomize Start Position
-    uint8_t sx = random(0, MAZE_SIZE);
-    uint8_t sy = random(0, MAZE_SIZE);
+    uint8_t sx = random(0, MAZE_WIDTH);
+    uint8_t sy = random(0, MAZE_HEIGHT);
     #ifdef DEBUG_MODE
     Serial.print("DEBUG: P1 start = (");
     Serial.print(sx);
@@ -67,17 +68,18 @@ void GameState::resetGame() {
     Serial.println("DEBUG: P1 initialized");
     #endif
 
-    if (two_player_mode) {
-        #ifdef DEBUG_MODE
-        Serial.println("DEBUG: Setting up Player 2...");
-        #endif
-        // Initialize Player 2 at DIFFERENT position
+    // Always 2-player mode
+    // if (two_player_mode) {
+    #ifdef DEBUG_MODE
+    Serial.println("DEBUG: Setting up Player 2...");
+    #endif
+    // Initialize Player 2 at DIFFERENT position
         uint8_t sx2, sy2;
         int dist_sq_p2;
         int p2_attempts = 0;
         do {
-            sx2 = random(0, MAZE_SIZE);
-            sy2 = random(0, MAZE_SIZE);
+            sx2 = random(0, MAZE_WIDTH);
+            sy2 = random(0, MAZE_HEIGHT);
 
             // Ensure some distance from Player 1
             int dx = (int)sx - (int)sx2;
@@ -101,10 +103,10 @@ void GameState::resetGame() {
         // Generate initial directions for Player 2
         maze.generateNewDirections(sx2, sy2);
         players[1].current_cell_dirs = maze.getCurrentDirections();
-        #ifdef DEBUG_MODE
-        Serial.println("DEBUG: P2 initialized");
-        #endif
-    }
+    #ifdef DEBUG_MODE
+    Serial.println("DEBUG: P2 initialized");
+    #endif
+    // } // End of two_player_mode block (disabled)
 
     #ifdef DEBUG_MODE
     Serial.println("DEBUG: Picking goal position...");
@@ -115,22 +117,18 @@ void GameState::resetGame() {
     int dist_sq1, dist_sq2;
     int goal_attempts = 0;
     do {
-        gx = random(0, MAZE_SIZE);
-        gy = random(0, MAZE_SIZE);
+        gx = random(0, MAZE_WIDTH);
+        gy = random(0, MAZE_HEIGHT);
 
         // Check dist from P1
         int dx1 = (int)sx - (int)gx;
         int dy1 = (int)sy - (int)gy;
         dist_sq1 = dx1*dx1 + dy1*dy1;
 
-        // Check dist from P2 (if relevant)
-        if (two_player_mode) {
-             int dx2 = (int)players[1].x - (int)gx;
-             int dy2 = (int)players[1].y - (int)gy;
-             dist_sq2 = dx2*dx2 + dy2*dy2;
-        } else {
-            dist_sq2 = 999; // Always pass
-        }
+        // Check dist from P2 (always 2-player)
+        int dx2 = (int)players[1].x - (int)gx;
+        int dy2 = (int)players[1].y - (int)gy;
+        dist_sq2 = dx2*dx2 + dy2*dy2;
 
         goal_attempts++;
         if (goal_attempts > 1000) {
@@ -157,9 +155,6 @@ void GameState::resetGame() {
     active_player = 0;  // Player 1 starts
     winner = 255;       // No winner yet
     state = STATE_PLAYING;
-
-    Serial.println("Game Reset. State: PLAYING");
-    if (two_player_mode) Serial.println("Mode: Two Player");
 }
 
 void GameState::handleInput(Direction dir) {
@@ -168,59 +163,64 @@ void GameState::handleInput(Direction dir) {
     switch (state) {
         case STATE_START:
             resetGame();
+            lastMoveResult = MOVE_VALID;  // Signal R4 that game started successfully
             break;
 
         case STATE_PLAYING:
-            if (two_player_mode) {
-                handleTwoPlayerMove(dir);
-            } else {
-                handleSinglePlayerMove(dir);
-            }
+            // Always 2-player mode
+            handleTwoPlayerMove(dir);
+            // if (two_player_mode) {
+            //     handleTwoPlayerMove(dir);
+            // } else {
+            //     handleSinglePlayerMove(dir);
+            // }
             break;
 
         case STATE_WIN:
             state = STATE_START;
+            lastMoveResult = MOVE_VALID;  // Signal R4 to continue (back to start screen)
             break;
     }
 }
 
-void GameState::handleSinglePlayerMove(Direction dir) {
-    Player& p = players[0];
-
-    #ifdef DEBUG_MODE
-    // Debug: Show what directions are available
-    Serial.print("Input: ");
-    Serial.print(dir == NORTH ? "N" : dir == SOUTH ? "S" : dir == EAST ? "E" : dir == WEST ? "W" : "?");
-    Serial.print(" | Pos: (");
-    Serial.print(p.x);
-    Serial.print(",");
-    Serial.print(p.y);
-    Serial.print(") | Available: ");
-    if (p.current_cell_dirs & (1 << NORTH)) Serial.print("N");
-    if (p.current_cell_dirs & (1 << SOUTH)) Serial.print("S");
-    if (p.current_cell_dirs & (1 << EAST)) Serial.print("E");
-    if (p.current_cell_dirs & (1 << WEST)) Serial.print("W");
-    #endif
-
-    if (isValidMove(p, dir)) {
-        movePlayer(p, dir);
-        p.moves++;
-        maze.generateNewDirections(p.x, p.y);
-        p.current_cell_dirs = maze.getCurrentDirections();
-        #ifdef DEBUG_MODE
-        Serial.println(" -> MOVED");
-        #endif
-
-        if (maze.isGoal(p.x, p.y)) {
-            state = STATE_WIN;
-            winner = 0;
-        }
-    } else {
-        #ifdef DEBUG_MODE
-        Serial.println(" -> BLOCKED");
-        #endif
-    }
-}
+// Disabled - always 2-player mode
+// void GameState::handleSinglePlayerMove(Direction dir) {
+//     Player& p = players[0];
+//
+//     #ifdef DEBUG_MODE
+//     // Debug: Show what directions are available
+//     Serial.print("Input: ");
+//     Serial.print(dir == NORTH ? "N" : dir == SOUTH ? "S" : dir == EAST ? "E" : dir == WEST ? "W" : "?");
+//     Serial.print(" | Pos: (");
+//     Serial.print(p.x);
+//     Serial.print(",");
+//     Serial.print(p.y);
+//     Serial.print(") | Available: ");
+//     if (p.current_cell_dirs & (1 << NORTH)) Serial.print("N");
+//     if (p.current_cell_dirs & (1 << SOUTH)) Serial.print("S");
+//     if (p.current_cell_dirs & (1 << EAST)) Serial.print("E");
+//     if (p.current_cell_dirs & (1 << WEST)) Serial.print("W");
+//     #endif
+//
+//     if (isValidMove(p, dir)) {
+//         movePlayer(p, dir);
+//         p.moves++;
+//         maze.generateNewDirections(p.x, p.y);
+//         p.current_cell_dirs = maze.getCurrentDirections();
+//         #ifdef DEBUG_MODE
+//         Serial.println(" -> MOVED");
+//         #endif
+//
+//         if (maze.isGoal(p.x, p.y)) {
+//             state = STATE_WIN;
+//             winner = 0;
+//         }
+//     } else {
+//         #ifdef DEBUG_MODE
+//         Serial.println(" -> BLOCKED");
+//         #endif
+//     }
+// }
 
 void GameState::handleTwoPlayerMove(Direction dir) {
     Player& p = players[active_player];
@@ -237,21 +237,31 @@ void GameState::handleTwoPlayerMove(Direction dir) {
         if (maze.isGoal(p.x, p.y)) {
             state = STATE_WIN;
             winner = active_player;
+            lastMoveResult = MOVE_WIN;  // NEW
             return;
         }
 
         // Switch turns (toggle between 0 and 1)
         active_player = 1 - active_player;
+        lastMoveResult = MOVE_VALID;  // NEW
+    } else {
+        lastMoveResult = MOVE_INVALID;  // NEW
     }
     // Invalid moves are ignored - no turn switch
+}
+
+MoveResult GameState::getLastMoveResult() {
+    MoveResult result = lastMoveResult;
+    lastMoveResult = MOVE_NONE;  // Clear after read
+    return result;
 }
 
 bool GameState::isValidMove(const Player& p, Direction dir) {
     // Check grid bounds
     switch (dir) {
         case NORTH: if (p.y == 0) return false; break;
-        case SOUTH: if (p.y >= MAZE_SIZE - 1) return false; break;
-        case EAST:  if (p.x >= MAZE_SIZE - 1) return false; break;
+        case SOUTH: if (p.y >= MAZE_HEIGHT - 1) return false; break;
+        case EAST:  if (p.x >= MAZE_WIDTH - 1) return false; break;
         case WEST:  if (p.x == 0) return false; break;
         default: return false;
     }
@@ -270,11 +280,9 @@ void GameState::movePlayer(Player& p, Direction dir) {
 }
 
 void GameState::update() {
-    // Update sprite animations
+    // Update sprite animations (always 2-player)
     SpriteRenderer::updateAnimation(&players[0].sprite);
-    if (two_player_mode) {
-        SpriteRenderer::updateAnimation(&players[1].sprite);
-    }
+    SpriteRenderer::updateAnimation(&players[1].sprite);
     SpriteRenderer::updateAnimation(&goal_sprite);
 }
 
@@ -286,28 +294,38 @@ void GameState::render(DisplayManager* display) {
     } else if (state == STATE_WIN) {
         renderWinScreen(display);
     } else {
-        // STATE_PLAYING
-        if (two_player_mode) {
-            renderTwoPlayer(display);
-        } else {
-            renderSinglePlayer(display);
-        }
+        // STATE_PLAYING - always 2-player
+        renderStatusBar(display);
+        renderTwoPlayer(display);
     }
 
     display->update();
 }
 
-void GameState::renderSinglePlayer(DisplayManager* display) {
-    // 1. Render fog (blue borders for accessible cells)
-    renderPlayerFog(display, players[0], PATH_COLOR);
-    // 2. Render blocked indicators (red lines on blocked cells)
-    renderBlockedDirections(display, players[0]);
-    // 3. Render goal
-    renderGoal(display);
-    // 4. Render player sprite
-    SpriteRenderer::draw(display, &players[0].sprite,
-                         players[0].x * CELL_SIZE, players[0].y * CELL_SIZE);
+void GameState::renderStatusBar(DisplayManager* display) {
+    display->fillRect(0, 0, 64, STATUS_BAR_HEIGHT, 0x0000);  // Clear bar
+    display->setTextSize(1);
+    
+    // Simple text for now: "P1" or "P2"
+    display->setCursor(2, 0);
+    display->setTextColor(players[active_player].color);
+    display->print("P");
+    display->print(active_player + 1);
+    display->print(" TURN");
 }
+
+// Disabled - always 2-player mode
+// void GameState::renderSinglePlayer(DisplayManager* display) {
+//     // 1. Render fog (blue borders for accessible cells)
+//     renderPlayerFog(display, players[0], PATH_COLOR);
+//     // 2. Render blocked indicators (red lines on blocked cells)
+//     renderBlockedDirections(display, players[0]);
+//     // 3. Render goal
+//     renderGoal(display);
+//     // 4. Render player sprite
+//     SpriteRenderer::draw(display, &players[0].sprite,
+//                          players[0].x * CELL_SIZE, players[0].y * CELL_SIZE);
+// }
 
 void GameState::renderTwoPlayer(DisplayManager* display) {
     // 1. Render Player 1's fog-of-war (blue)
@@ -325,9 +343,9 @@ void GameState::renderTwoPlayer(DisplayManager* display) {
 
     // 6. Draw both players (always visible)
     SpriteRenderer::draw(display, &players[0].sprite,
-                         players[0].x * CELL_SIZE, players[0].y * CELL_SIZE);
+                         players[0].x * CELL_SIZE, players[0].y * CELL_SIZE + MAZE_OFFSET_Y);
     SpriteRenderer::draw(display, &players[1].sprite,
-                         players[1].x * CELL_SIZE, players[1].y * CELL_SIZE);
+                         players[1].x * CELL_SIZE, players[1].y * CELL_SIZE + MAZE_OFFSET_Y);
 
     // 7. Draw turn indicator (corner square)
     display->drawRect(TURN_INDICATOR_X - 1, TURN_INDICATOR_Y - 1, 6, 6, ACTIVE_HIGHLIGHT);
@@ -350,19 +368,19 @@ void GameState::renderPlayerFog(DisplayManager* display, const Player& p, uint16
     // Draw border for each valid adjacent cell (don't overdraw goal)
     if ((dirs & (1 << NORTH)) && p.y > 0) {
         if (!(p.x == gx && p.y - 1 == gy))
-            drawThickBorder(p.x * CELL_SIZE, (p.y - 1) * CELL_SIZE);
+            drawThickBorder(p.x * CELL_SIZE, (p.y - 1) * CELL_SIZE + MAZE_OFFSET_Y);
     }
-    if ((dirs & (1 << SOUTH)) && p.y < MAZE_SIZE - 1) {
+    if ((dirs & (1 << SOUTH)) && p.y < MAZE_HEIGHT - 1) {
         if (!(p.x == gx && p.y + 1 == gy))
-            drawThickBorder(p.x * CELL_SIZE, (p.y + 1) * CELL_SIZE);
+            drawThickBorder(p.x * CELL_SIZE, (p.y + 1) * CELL_SIZE + MAZE_OFFSET_Y);
     }
-    if ((dirs & (1 << EAST)) && p.x < MAZE_SIZE - 1) {
+    if ((dirs & (1 << EAST)) && p.x < MAZE_WIDTH - 1) {
         if (!(p.x + 1 == gx && p.y == gy))
-            drawThickBorder((p.x + 1) * CELL_SIZE, p.y * CELL_SIZE);
+            drawThickBorder((p.x + 1) * CELL_SIZE, p.y * CELL_SIZE + MAZE_OFFSET_Y);
     }
     if ((dirs & (1 << WEST)) && p.x > 0) {
         if (!(p.x - 1 == gx && p.y == gy))
-            drawThickBorder((p.x - 1) * CELL_SIZE, p.y * CELL_SIZE);
+            drawThickBorder((p.x - 1) * CELL_SIZE, p.y * CELL_SIZE + MAZE_OFFSET_Y);
     }
 }
 
@@ -377,7 +395,7 @@ void GameState::renderBlockedDirections(DisplayManager* display, const Player& p
     // NORTH neighbor - draw red line on ITS bottom edge (facing player)
     if (p.y > 0 && !(dirs & (1 << NORTH))) {
         int16_t nx = p.x * CELL_SIZE;
-        int16_t ny = (p.y - 1) * CELL_SIZE;
+        int16_t ny = (p.y - 1) * CELL_SIZE + MAZE_OFFSET_Y;
         // Skip if this is the goal cell (handled separately)
         if (!(p.x == gx && p.y - 1 == gy)) {
             display->fillRect(nx, ny + CELL_SIZE - 2, CELL_SIZE, 2, BLOCKED_COLOR);
@@ -385,18 +403,18 @@ void GameState::renderBlockedDirections(DisplayManager* display, const Player& p
     }
 
     // SOUTH neighbor - draw red line on ITS top edge (facing player)
-    if (p.y < MAZE_SIZE - 1 && !(dirs & (1 << SOUTH))) {
+    if (p.y < MAZE_HEIGHT - 1 && !(dirs & (1 << SOUTH))) {
         int16_t nx = p.x * CELL_SIZE;
-        int16_t ny = (p.y + 1) * CELL_SIZE;
+        int16_t ny = (p.y + 1) * CELL_SIZE + MAZE_OFFSET_Y;
         if (!(p.x == gx && p.y + 1 == gy)) {
             display->fillRect(nx, ny, CELL_SIZE, 2, BLOCKED_COLOR);
         }
     }
 
     // EAST neighbor - draw red line on ITS left edge (facing player)
-    if (p.x < MAZE_SIZE - 1 && !(dirs & (1 << EAST))) {
+    if (p.x < MAZE_WIDTH - 1 && !(dirs & (1 << EAST))) {
         int16_t nx = (p.x + 1) * CELL_SIZE;
-        int16_t ny = p.y * CELL_SIZE;
+        int16_t ny = p.y * CELL_SIZE + MAZE_OFFSET_Y;
         if (!(p.x + 1 == gx && p.y == gy)) {
             display->fillRect(nx, ny, 2, CELL_SIZE, BLOCKED_COLOR);
         }
@@ -405,7 +423,7 @@ void GameState::renderBlockedDirections(DisplayManager* display, const Player& p
     // WEST neighbor - draw red line on ITS right edge (facing player)
     if (p.x > 0 && !(dirs & (1 << WEST))) {
         int16_t nx = (p.x - 1) * CELL_SIZE;
-        int16_t ny = p.y * CELL_SIZE;
+        int16_t ny = p.y * CELL_SIZE + MAZE_OFFSET_Y;
         if (!(p.x - 1 == gx && p.y == gy)) {
             display->fillRect(nx + CELL_SIZE - 2, ny, 2, CELL_SIZE, BLOCKED_COLOR);
         }
@@ -414,7 +432,7 @@ void GameState::renderBlockedDirections(DisplayManager* display, const Player& p
 
 void GameState::drawGoalBarrier(DisplayManager* display, uint8_t gx, uint8_t gy, const Player& p) {
     int16_t gpx = gx * CELL_SIZE;
-    int16_t gpy = gy * CELL_SIZE;
+    int16_t gpy = gy * CELL_SIZE + MAZE_OFFSET_Y;
 
     // Draw red barrier on the goal cell edge facing the player
     if (p.x < gx) {  // Player is WEST of goal -> barrier on goal's LEFT edge
@@ -432,19 +450,16 @@ void GameState::renderGoal(DisplayManager* display) {
     uint8_t gx = maze.getGoalX();
     uint8_t gy = maze.getGoalY();
     int16_t gpx = gx * CELL_SIZE;
-    int16_t gpy = gy * CELL_SIZE;
+    int16_t gpy = gy * CELL_SIZE + MAZE_OFFSET_Y;
 
-    // Calculate distance for color
+    // Calculate distance for color (always 2-player)
     uint8_t dist1 = abs((int)players[0].x - (int)gx) + abs((int)players[0].y - (int)gy);
-    uint8_t min_dist = dist1;
-    if (two_player_mode) {
-        uint8_t dist2 = abs((int)players[1].x - (int)gx) + abs((int)players[1].y - (int)gy);
-        if (dist2 < min_dist) min_dist = dist2;
-    }
+    uint8_t dist2 = abs((int)players[1].x - (int)gx) + abs((int)players[1].y - (int)gy);
+    uint8_t min_dist = (dist2 < dist1) ? dist2 : dist1;
 
-    // Check adjacency and reachability for each player
+    // Check adjacency and reachability for each player (always 2-player)
     bool p1_adjacent = isAdjacent(players[0], gx, gy);
-    bool p2_adjacent = two_player_mode && isAdjacent(players[1], gx, gy);
+    bool p2_adjacent = isAdjacent(players[1], gx, gy);
     bool p1_can_reach = p1_adjacent && canReachGoal(players[0], gx, gy);
     bool p2_can_reach = p2_adjacent && canReachGoal(players[1], gx, gy);
 
@@ -525,21 +540,15 @@ void GameState::renderStartScreen(DisplayManager* display) {
     display->setCursor(cursorX, cursorY);
     display->print(TEXT_TITLE_L2_SUF);
 
-    // Mode Indicator
-    if (two_player_mode) {
-        display->setTextColor(PLAYER2_COLOR);
-        display->setCursor(8, 35);
-        display->print(TEXT_MODE_2P);
-    } else {
-        display->setTextColor(PATH_COLOR);
-        display->setCursor(8, 35);
-        display->print(TEXT_MODE_1P);
-    }
+    // Mode Indicator - always 2-player
+    display->setTextColor(PLAYER2_COLOR);
+    display->setCursor(8, 35);
+    display->print(TEXT_MODE_2P);
 
-    // Toggle Instruction
-    display->setTextColor(0xAAAA); // Light Gray
-    display->setCursor(10, 45);
-    display->print(TEXT_TOGGLE_BTN);
+    // Toggle Instruction - disabled (always 2-player)
+    // display->setTextColor(0xAAAA); // Light Gray
+    // display->setCursor(10, 45);
+    // display->print(TEXT_TOGGLE_BTN);
 
     // Footer
     display->setTextColor(GOAL_COLOR);
@@ -548,36 +557,35 @@ void GameState::renderStartScreen(DisplayManager* display) {
 }
 
 void GameState::renderWinScreen(DisplayManager* display) {
-    if (!two_player_mode) {
-        // Existing single-player win screen
-        display->setTextColor(GOAL_COLOR);
-        display->setCursor(10, 10);
-        display->print(TEXT_YOU_WIN);
-        display->setTextColor(0xFFFF);
-        display->setCursor(10, 25);
-        display->print(TEXT_MOVES_LABEL);
-        display->print(players[0].moves);
-    } else {
-        // Two-player win screen
-        display->setTextColor(GOAL_COLOR);
-        display->setCursor(4, 5);
-        display->print(TEXT_PLAYER_PREFIX);
-        display->print(winner + 1);
-        display->setCursor(10, 18);
-        display->print(TEXT_WINS_SUFFIX);
+    // Always 2-player win screen
+    display->setTextColor(GOAL_COLOR);
+    display->setCursor(4, 5);
+    display->print(TEXT_PLAYER_PREFIX);
+    display->print(winner + 1);
+    display->setCursor(10, 18);
+    display->print(TEXT_WINS_SUFFIX);
 
-        // Show both move counts
-        display->setTextColor(PLAYER1_COLOR);
-        display->setCursor(4, 32);
-        display->print(TEXT_P1_LABEL);
-        display->print(players[0].moves);
+    // Show both move counts
+    display->setTextColor(PLAYER1_COLOR);
+    display->setCursor(4, 32);
+    display->print(TEXT_P1_LABEL);
+    display->print(players[0].moves);
 
-        
-        display->setTextColor(PLAYER2_COLOR);
-        display->setCursor(4, 42);
-        display->print(TEXT_P2_LABEL);
-        display->print(players[1].moves);
-    }
+    display->setTextColor(PLAYER2_COLOR);
+    display->setCursor(4, 42);
+    display->print(TEXT_P2_LABEL);
+    display->print(players[1].moves);
+
+    // Disabled single-player win screen
+    // if (!two_player_mode) {
+    //     display->setTextColor(GOAL_COLOR);
+    //     display->setCursor(10, 10);
+    //     display->print(TEXT_YOU_WIN);
+    //     display->setTextColor(0xFFFF);
+    //     display->setCursor(10, 25);
+    //     display->print(TEXT_MOVES_LABEL);
+    //     display->print(players[0].moves);
+    // }
 
     display->setTextColor(PLAYER_COLOR); // Red
     display->setCursor(4, 54);
