@@ -5,17 +5,18 @@
   Pico expects 8-byte binary packets:
     AA 55 Xlo Xhi Ylo Yhi mask checksum(XOR 0..6)
 
-  Turn-based behavior (NEW):
-  - MINIGAME_MODE: Mouse control active, maze frozen. Waiting for BTN_A.
-  - MAZE_ARMED: Mouse frozen. Waiting for Joystick move.
-  - MAZE_PULSING: Sending ONE move to Pico.
-  - WAITING_ACK: Waiting for V/I/W from Pico.
+  Two-mode system:
+  - PROTOPIE_MODE: Joystick = mouse cursor, D6 = left click, maze frozen
+  - MAZE_MODE: Joystick = maze control, mouse frozen
+
+  D9 toggles between modes. After valid maze move, auto-switches to PROTOPIE_MODE.
 */
 
 /// ---------- Pins ----------
 static const int PIN_VRX = A0;
 static const int PIN_VRY = A1;
-static const int PIN_SW  = 9;
+static const int PIN_SW  = 6;       // Joystick switch on D6 (left click)
+static const int BTN_TOGGLE = 9;    // Mode toggle button on D9
 
 static const int BTN_A = 2;
 static const int BTN_B = 3;
@@ -25,8 +26,6 @@ static const int BTN_D = 5;
 static const int BTN_ENTER = 7;
 static const int SW_POWER  = 8;
 
-// NEW: Reset button (Plan suggests 13)
-static const int BTN_RESET = 13;
 
 /// ---------- UART ----------
 static const uint32_t BAUD_PICO = 115200;
@@ -42,7 +41,6 @@ static const int MAX_SPEED = 10;
 static const uint16_t MOUSE_UPDATE_MS = 10;
 
 /// ---------- Debounce ----------
-static const uint16_t SW_DEBOUNCE_MS = 30;
 static const uint16_t BTN_DEBOUNCE_MS = 140;
 
 /// ---------- Protocol ----------
@@ -50,28 +48,22 @@ static const uint8_t H0 = 0xAA;
 static const uint8_t H1 = 0x55;
 
 /// ---------- Mode State ----------
-enum Player { PLAYER_1, PLAYER_2 };
-static Player currentPlayer = PLAYER_1;
-
 enum ControlState {
-  MINIGAME_MODE,     // ProtoPie mouse control, maze frozen, waiting for BTN_A
-  MAZE_ARMED,        // BTN_A pressed, waiting for joystick direction
+  PROTOPIE_MODE,     // Joystick = mouse, D6 = left click, maze frozen
+  MAZE_ARMED,        // Joystick = maze control, waiting for direction
   MAZE_PULSING,      // Sending move pulse to Pico
-  WAITING_ACK        // Waiting for Pico's V/I/W response
+  WAITING_ACK        // Waiting for Pico's V/I/G response
 };
-static ControlState state = MINIGAME_MODE;
+static ControlState state = PROTOPIE_MODE;
 
 /// ---------- Timing ----------
 static uint32_t lastSendMs = 0;
 static uint32_t lastMouseMs = 0;
 static uint32_t lastA=0, lastB=0, lastC=0, lastD=0;
 static uint32_t lastEnter = 0;
-static uint32_t lastReset = 0;
+static uint32_t lastClick = 0;   // D6 left click debounce
+static uint32_t lastToggle = 0;  // D9 mode toggle debounce
 
-/// ---------- Joystick-switch debounce ----------
-static bool swStable = false;
-static bool swLastReading = false;
-static uint32_t swLastChange = 0;
 
 /// ---------- Power switch ----------
 static const int POWER_OFF_LEVEL = HIGH;
@@ -115,13 +107,6 @@ static inline void tapABCD(char letterUpper) {
   }
 }
 
-static inline uint8_t makeBtnMask(bool jswHeld, bool aHeld) {
-  uint8_t m = 0;
-  if (jswHeld) m |= (1 << 0);
-  if (aHeld)   m |= (1 << 1);
-  return m;
-}
-
 static void sendPacket(uint16_t rawX, uint16_t rawY, uint8_t btnMask) {
   uint8_t p[8];
   p[0] = H0;
@@ -139,20 +124,6 @@ static void sendPacket(uint16_t rawX, uint16_t rawY, uint8_t btnMask) {
   Serial1.write(p, sizeof(p));
 }
 
-static bool swPressedEvent(uint32_t now) {
-  bool reading = (digitalRead(PIN_SW) == LOW);
-  if (reading != swLastReading) {
-    swLastChange = now;
-    swLastReading = reading;
-  }
-  if ((now - swLastChange) > SW_DEBOUNCE_MS) {
-    if (reading != swStable) {
-      swStable = reading;
-      if (swStable) return true;
-    }
-  }
-  return false;
-}
 
 static inline Dir getDirFromXY(int x, int y) {
   if (x == 0 && y == 0) return DIR_NEUTRAL;
@@ -174,14 +145,14 @@ static inline void dirToRaw(Dir d, uint16_t &outX, uint16_t &outY) {
 }
 
 void setup() {
-  pinMode(PIN_SW, INPUT_PULLUP);
+  pinMode(PIN_SW, INPUT_PULLUP);     // D6 - joystick switch (left click)
+  pinMode(BTN_TOGGLE, INPUT_PULLUP); // D9 - mode toggle
   pinMode(BTN_A, INPUT_PULLUP);
   pinMode(BTN_B, INPUT_PULLUP);
   pinMode(BTN_C, INPUT_PULLUP);
   pinMode(BTN_D, INPUT_PULLUP);
   pinMode(BTN_ENTER, INPUT_PULLUP);
   pinMode(SW_POWER, INPUT_PULLUP);
-  pinMode(BTN_RESET, INPUT_PULLUP); // R4 WiFi USER button check needed
 
   Serial.begin(115200);
   delay(200);
@@ -195,8 +166,8 @@ void setup() {
 
   powerWasOff = (digitalRead(SW_POWER) == POWER_OFF_LEVEL);
 
-  Serial.println("UNO R4 started. Mode: MINIGAME_MODE");
-  Serial.println("P1 Turn. Waiting for BTN_A to arm maze.");
+  Serial.println("UNO R4 started. Mode: PROTOPIE_MODE");
+  Serial.println("D6=click, D9=toggle mode, ABCD=keys");
 }
 
 void loop() {
@@ -210,18 +181,7 @@ void loop() {
   }
   powerWasOff = powerIsOff;
 
-  // 2. Reset Button Logic
-  if (digitalRead(BTN_RESET) == LOW && (now - lastReset >= BTN_DEBOUNCE_MS)) {
-    Serial1.write('R'); // Send to Pico
-    Keyboard.write('r'); // Send to ProtoPie
-    currentPlayer = PLAYER_1;
-    state = MINIGAME_MODE;
-    pulsingMove = false;
-    lastReset = now;
-    Serial.println("[RESET] System Reset -> P1 / MINIGAME");
-  }
-
-  // 3. Read Inputs
+  // 2. Read Inputs
   int rawX_i = analogRead(PIN_VRX);
   int rawY_i = analogRead(PIN_VRY);
   int yCentered = (rawY_i - CENTER) * Y_POLARITY;
@@ -234,40 +194,48 @@ void loop() {
   int x = applyDeadzone(cx);
   int y = applyDeadzone(cy);
 
-  // bool swPress = swPressedEvent(now); // Unused in new plan
-  bool swHeld  = (digitalRead(PIN_SW) == LOW);
-  bool aHeld   = (digitalRead(BTN_A) == LOW);
-  uint8_t mask = makeBtnMask(swHeld, aHeld); // Pass button state to Pico if needed
+  uint8_t mask = 0;  // Button mask for Pico (not used for mode control)
 
-  // 4. Global Button Handlers (B, C, D, Enter)
+  // 3. Global Button Handlers (A, B, C, D, Enter)
   if (digitalRead(BTN_ENTER) == LOW && (now - lastEnter >= BTN_DEBOUNCE_MS)) {
     Keyboard.write(KEY_RETURN);
     lastEnter = now;
     Serial.println("[KEY] ENTER");
   }
+  if (digitalRead(BTN_A) == LOW && (now - lastA >= BTN_DEBOUNCE_MS)) { tapABCD('A'); lastA = now; }
   if (digitalRead(BTN_B) == LOW && (now - lastB >= BTN_DEBOUNCE_MS)) { tapABCD('B'); lastB = now; }
   if (digitalRead(BTN_C) == LOW && (now - lastC >= BTN_DEBOUNCE_MS)) { tapABCD('C'); lastC = now; }
   if (digitalRead(BTN_D) == LOW && (now - lastD >= BTN_DEBOUNCE_MS)) { tapABCD('D'); lastD = now; }
 
-  // 5. BTN_A Handler (Arms Maze)
-  if (digitalRead(BTN_A) == LOW && (now - lastA >= BTN_DEBOUNCE_MS)) {
-    if (state == MINIGAME_MODE) {
+  // 4. D9 Mode Toggle Handler
+  if (digitalRead(BTN_TOGGLE) == LOW && (now - lastToggle >= BTN_DEBOUNCE_MS)) {
+    if (state == PROTOPIE_MODE) {
       state = MAZE_ARMED;
-      Serial.print("[ARMED] Player ");
-      Serial.println(currentPlayer == PLAYER_1 ? "1" : "2");
+      lastDir = DIR_NEUTRAL;  // Reset direction tracking
+      Serial.println("[MODE] -> MAZE");
+    } else if (state == MAZE_ARMED) {
+      state = PROTOPIE_MODE;
+      Serial.println("[MODE] -> PROTOPIE");
     }
-    lastA = now;
+    // Don't toggle during MAZE_PULSING or WAITING_ACK
+    lastToggle = now;
   }
 
-  // 6. State Machine
+  // 5. State Machine
   switch (state) {
-    case MINIGAME_MODE:
+    case PROTOPIE_MODE:
       // Mouse Control Active
       if (now - lastMouseMs >= MOUSE_UPDATE_MS) {
         int dx = joyToSpeed(x);
         int dy = joyToSpeed(y);
         if (dx != 0 || dy != 0) Mouse.move(dx, dy, 0);
         lastMouseMs = now;
+      }
+      // D6 Left Click Handler (only in PROTOPIE_MODE)
+      if (digitalRead(PIN_SW) == LOW && (now - lastClick >= BTN_DEBOUNCE_MS)) {
+        Mouse.click(MOUSE_LEFT);
+        lastClick = now;
+        Serial.println("[CLICK] Left");
       }
       // Keep Pico Maze Frozen
       if (now - lastSendMs >= SEND_PERIOD_MS) {
@@ -327,23 +295,22 @@ void loop() {
       while (Serial1.available()) {
         char c = Serial1.read();
         if (c == 'V') {
-           // Valid Move
-           currentPlayer = (currentPlayer == PLAYER_1) ? PLAYER_2 : PLAYER_1;
-           Keyboard.write('v'); // Tell ProtoPie
-           state = MINIGAME_MODE;
-           Serial.print("[VALID] Swap to P");
-           Serial.println(currentPlayer == PLAYER_1 ? "1" : "2");
-        } 
+           // Valid Move - auto switch to ProtoPie mode
+           Keyboard.write('t'); // Tell ProtoPie (turn complete)
+           state = PROTOPIE_MODE;
+           Serial.println("[VALID] -> PROTOPIE mode");
+        }
         else if (c == 'I') {
-           // Invalid Move
-           state = MAZE_ARMED; // Let them try again
+           // Invalid Move - stay in maze mode to retry
+           state = MAZE_ARMED;
+           lastDir = DIR_NEUTRAL;  // Reset direction tracking
            Serial.println("[INVALID] Try again");
-        } 
-        else if (c == 'W') {
-           // Win
-           Keyboard.write('w'); // Tell ProtoPie
-           state = MINIGAME_MODE;
-           Serial.println("[WIN] Game Over");
+        }
+        else if (c == 'G') {
+           // Goal reached - auto switch to ProtoPie mode
+           Keyboard.write('g'); // Tell ProtoPie (goal reached)
+           state = PROTOPIE_MODE;
+           Serial.println("[GOAL] -> PROTOPIE mode");
         }
       }
       break;

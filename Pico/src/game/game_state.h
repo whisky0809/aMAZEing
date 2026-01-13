@@ -11,7 +11,7 @@
 enum GameMode {
     STATE_START,
     STATE_PLAYING,
-    STATE_WIN
+    STATE_GOAL_MESSAGE  // Showing "A little bit more" rainbow text
 };
 
 // Move result for R4 acknowledgment
@@ -19,7 +19,7 @@ enum MoveResult {
     MOVE_NONE,      // No move attempted yet
     MOVE_VALID,     // Valid move executed
     MOVE_INVALID,   // Invalid move (wall/boundary)
-    MOVE_WIN        // Player reached goal
+    MOVE_GOAL       // Player reached goal (goal relocates, game continues)
 };
 
 // Player data structure
@@ -39,10 +39,11 @@ private:
     SpriteInstance goal_sprite;  // Animated goal sprite
 
     uint8_t active_player;     // 0 or 1 (whose turn)
-    uint8_t winner;            // 0, 1, or 255 (no winner)
     MoveResult lastMoveResult; // Result of last move attempt
+    uint32_t goalMessageStart; // Timer for goal message display
 
     void resetGame();
+    void relocateGoal();       // Move goal to new random location
 
     // Internal helpers
     void handleTwoPlayerMove(Direction dir);
@@ -55,7 +56,7 @@ private:
     void renderGoal(DisplayManager* display);
     void drawGoalBarrier(DisplayManager* display, uint8_t gx, uint8_t gy, const Player& p);
     void renderStartScreen(DisplayManager* display);
-    void renderWinScreen(DisplayManager* display);
+    void renderGoalMessage(DisplayManager* display);  // "A little bit more" rainbow
     bool isAdjacent(const Player& p, uint8_t gx, uint8_t gy);
     bool canReachGoal(const Player& p, uint8_t gx, uint8_t gy);
     uint16_t getGoalColorForDistance(uint8_t min_distance);

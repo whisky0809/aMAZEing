@@ -5,11 +5,10 @@
 #include "../sprites/goal_sprites.h"
 
 GameState::GameState() {
-    // two_player_mode = false; // Disabled - always 2-player
     active_player = 0;
-    winner = 255;
     state = STATE_START;
     lastMoveResult = MOVE_NONE;
+    goalMessageStart = 0;
 }
 
 void GameState::init() {
@@ -153,8 +152,42 @@ void GameState::resetGame() {
     SpriteRenderer::initInstance(&goal_sprite, &GOAL_SPRITE);
 
     active_player = 0;  // Player 1 starts
-    winner = 255;       // No winner yet
     state = STATE_PLAYING;
+}
+
+void GameState::relocateGoal() {
+    // Pick new goal position away from both players
+    uint8_t gx, gy;
+    int dist_sq1, dist_sq2;
+    int goal_attempts = 0;
+
+    do {
+        gx = random(0, MAZE_WIDTH);
+        gy = random(0, MAZE_HEIGHT);
+
+        // Check dist from P1
+        int dx1 = (int)players[0].x - (int)gx;
+        int dy1 = (int)players[0].y - (int)gy;
+        dist_sq1 = dx1*dx1 + dy1*dy1;
+
+        // Check dist from P2
+        int dx2 = (int)players[1].x - (int)gx;
+        int dy2 = (int)players[1].y - (int)gy;
+        dist_sq2 = dx2*dx2 + dy2*dy2;
+
+        goal_attempts++;
+        if (goal_attempts > 1000) break;
+    } while (dist_sq1 < 49 || dist_sq2 < 49);  // Min distance ~7 units from both
+
+    maze.setGoal(gx, gy);
+
+    #ifdef DEBUG_MODE
+    Serial.print("Goal relocated to (");
+    Serial.print(gx);
+    Serial.print(",");
+    Serial.print(gy);
+    Serial.println(")");
+    #endif
 }
 
 void GameState::handleInput(Direction dir) {
@@ -167,18 +200,11 @@ void GameState::handleInput(Direction dir) {
             break;
 
         case STATE_PLAYING:
-            // Always 2-player mode
             handleTwoPlayerMove(dir);
-            // if (two_player_mode) {
-            //     handleTwoPlayerMove(dir);
-            // } else {
-            //     handleSinglePlayerMove(dir);
-            // }
             break;
 
-        case STATE_WIN:
-            state = STATE_START;
-            lastMoveResult = MOVE_VALID;  // Signal R4 to continue (back to start screen)
+        case STATE_GOAL_MESSAGE:
+            // Ignore input during goal message display
             break;
     }
 }
@@ -229,25 +255,28 @@ void GameState::handleTwoPlayerMove(Direction dir) {
         // Valid move: execute and switch turns
         movePlayer(p, dir);
         p.moves++;
-        
+
         // Generate directions for THIS player's new location
         maze.generateNewDirections(p.x, p.y);
         p.current_cell_dirs = maze.getCurrentDirections();
 
         if (maze.isGoal(p.x, p.y)) {
-            state = STATE_WIN;
-            winner = active_player;
-            lastMoveResult = MOVE_WIN;  // NEW
+            // Goal reached! Show message, relocate goal, continue game
+            state = STATE_GOAL_MESSAGE;
+            goalMessageStart = millis();
+            lastMoveResult = MOVE_GOAL;
+            relocateGoal();  // Move goal to new position
+            // Switch turns after goal reached
+            active_player = 1 - active_player;
             return;
         }
 
         // Switch turns (toggle between 0 and 1)
         active_player = 1 - active_player;
-        lastMoveResult = MOVE_VALID;  // NEW
+        lastMoveResult = MOVE_VALID;
     } else {
-        lastMoveResult = MOVE_INVALID;  // NEW
+        lastMoveResult = MOVE_INVALID;
     }
-    // Invalid moves are ignored - no turn switch
 }
 
 MoveResult GameState::getLastMoveResult() {
@@ -284,6 +313,11 @@ void GameState::update() {
     SpriteRenderer::updateAnimation(&players[0].sprite);
     SpriteRenderer::updateAnimation(&players[1].sprite);
     SpriteRenderer::updateAnimation(&goal_sprite);
+
+    // Check if goal message display time has elapsed (2 seconds)
+    if (state == STATE_GOAL_MESSAGE && (millis() - goalMessageStart >= 2000)) {
+        state = STATE_PLAYING;
+    }
 }
 
 void GameState::render(DisplayManager* display) {
@@ -291,10 +325,10 @@ void GameState::render(DisplayManager* display) {
 
     if (state == STATE_START) {
         renderStartScreen(display);
-    } else if (state == STATE_WIN) {
-        renderWinScreen(display);
+    } else if (state == STATE_GOAL_MESSAGE) {
+        renderGoalMessage(display);
     } else {
-        // STATE_PLAYING - always 2-player
+        // STATE_PLAYING
         renderStatusBar(display);
         renderTwoPlayer(display);
     }
@@ -556,38 +590,46 @@ void GameState::renderStartScreen(DisplayManager* display) {
     display->print(TEXT_PRESS_KEY);
 }
 
-void GameState::renderWinScreen(DisplayManager* display) {
-    // Always 2-player win screen
-    display->setTextColor(GOAL_COLOR);
-    display->setCursor(4, 5);
-    display->print(TEXT_PLAYER_PREFIX);
-    display->print(winner + 1);
-    display->setCursor(10, 18);
-    display->print(TEXT_WINS_SUFFIX);
+void GameState::renderGoalMessage(DisplayManager* display) {
+    // Display "A little bit more" with rainbow colors
+    display->setTextSize(1);
 
-    // Show both move counts
-    display->setTextColor(PLAYER1_COLOR);
-    display->setCursor(4, 32);
-    display->print(TEXT_P1_LABEL);
-    display->print(players[0].moves);
+    // Calculate rainbow hue based on time for animation
+    uint32_t elapsed = millis() - goalMessageStart;
+    uint8_t hue_offset = (elapsed / 50) % 256;  // Shift hue over time
 
-    display->setTextColor(PLAYER2_COLOR);
-    display->setCursor(4, 42);
-    display->print(TEXT_P2_LABEL);
-    display->print(players[1].moves);
+    // Rainbow colors array (6 colors cycling)
+    uint16_t rainbow_colors[] = {
+        0xF800,  // Red
+        0xFC00,  // Orange
+        0xFFE0,  // Yellow
+        0x07E0,  // Green
+        0x001F,  // Blue
+        0xF81F   // Magenta
+    };
 
-    // Disabled single-player win screen
-    // if (!two_player_mode) {
-    //     display->setTextColor(GOAL_COLOR);
-    //     display->setCursor(10, 10);
-    //     display->print(TEXT_YOU_WIN);
-    //     display->setTextColor(0xFFFF);
-    //     display->setCursor(10, 25);
-    //     display->print(TEXT_MOVES_LABEL);
-    //     display->print(players[0].moves);
-    // }
+    // Helper buffer for single character printing
+    char buf[2] = {0, 0};
 
-    display->setTextColor(PLAYER_COLOR); // Red
-    display->setCursor(4, 54);
-    display->print(TEXT_PRESS_KEY);
+    // "A little" - Line 1 (centered)
+    const char* line1 = "A little";
+    int16_t x1 = (64 - 8 * 6) / 2;  // 8 chars * 6px = 48px, center
+    display->setCursor(x1, 18);
+    for (int i = 0; line1[i] != '\0'; i++) {
+        uint8_t color_idx = (i + hue_offset / 43) % 6;
+        display->setTextColor(rainbow_colors[color_idx]);
+        buf[0] = line1[i];
+        display->print(buf);
+    }
+
+    // "bit more" - Line 2 (centered)
+    const char* line2 = "bit more";
+    int16_t x2 = (64 - 8 * 6) / 2;  // 8 chars * 6px = 48px, center
+    display->setCursor(x2, 32);
+    for (int i = 0; line2[i] != '\0'; i++) {
+        uint8_t color_idx = (i + 4 + hue_offset / 43) % 6;  // Offset by 4 for continuity
+        display->setTextColor(rainbow_colors[color_idx]);
+        buf[0] = line2[i];
+        display->print(buf);
+    }
 }

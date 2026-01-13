@@ -79,9 +79,9 @@ void loop() {
             Serial1.write('V');
         } else if (res == MOVE_INVALID) {
             Serial1.write('I');
-        } else if (res == MOVE_WIN) {
-            Serial1.write('W');
-            Serial.println("[GAME] Win!");
+        } else if (res == MOVE_GOAL) {
+            Serial1.write('G');
+            Serial.println("[GAME] Goal reached, relocating!");
         }
     }
 
