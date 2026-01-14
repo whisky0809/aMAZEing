@@ -20,7 +20,7 @@
 // =============================================================================
 
 // Color palette
-#define B1   0xE00A  // Body - Magenta-red (#e50056 - RGB: 229/0/86)
+#define B1   0x5F0B  // Body - Green (matching PLAYER1_COLOR)
 #define D1   0x7005  // Dark - shadow/outline
 #define L1   0xF80E  // Light - highlight
 #define S1   0xFE73  // Skin - head (Unused in new design)
@@ -76,7 +76,7 @@ const uint16_t* const PROGMEM P1_IDLE_FRAMES[] = {
 // =============================================================================
 
 // Color palette for Player 2
-#define B2   0x07FF  // Body - Cyan
+#define B2   0xF800  // Body - Red (matching PLAYER2_COLOR)
 #define D2   0x0410  // Dark - shadow/outline
 #define L2   0x7FFF  // Light - highlight
 #define S2   0xFE73  // Skin - head (Unused in new design)

@@ -84,7 +84,7 @@
 #define TEXT_TITLE_L2_PRE   "a"
 #define TEXT_TITLE_L2_MAIN  "MAZE"
 #define TEXT_TITLE_L2_SUF   "ing"
-#define TEXT_PRESS_KEY      "Press red"
+#define TEXT_PRESS_KEY      "Press blue"
 
 // Goal Message Text (shown when goal is reached)
 #define TEXT_GOAL_L1        "A little"
