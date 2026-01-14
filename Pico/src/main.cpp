@@ -71,17 +71,24 @@ void loop() {
     Direction dir = (uart_dir != DIR_NONE) ? uart_dir : serial_dir;
 
     if (dir != DIR_NONE) {
+        // Debug: Print received direction
+        static const char* dirNames[] = {"N", "E", "S", "W"};
+        Serial.print("[INPUT] Direction: ");
+        Serial.println(dirNames[dir]);
+
         game.handleInput(dir);
 
         // Send response to R4 controller
         MoveResult res = game.getLastMoveResult();
         if (res == MOVE_VALID) {
             Serial1.write('V');
+            Serial.println("[RESPONSE] V (valid move)");
         } else if (res == MOVE_INVALID) {
             Serial1.write('I');
+            Serial.println("[RESPONSE] I (blocked)");
         } else if (res == MOVE_GOAL) {
             Serial1.write('G');
-            Serial.println("[GAME] Goal reached, relocating!");
+            Serial.println("[RESPONSE] G (goal reached!)");
         }
     }
 
@@ -91,19 +98,10 @@ void loop() {
         game.init();
     }
 
-    // Mode toggle disabled - always 2-player mode
-    // bool toggle_requested = serial_input.isToggleModeRequested() ||
-    //                         uart_input.isToggleModeRequested();
-    // if (toggle_requested && game.isStartScreen()) {
-    //     static bool two_player = false;
-    //     two_player = !two_player;
-    //     game.setTwoPlayerMode(two_player);
-    //     Serial.println("========================================");
-    //     Serial.print("  Two-player mode: ");
-    //     Serial.println(two_player ? "ON" : "OFF");
-    //     Serial.println("========================================");
-    //     game.init();  // Restart with new mode
-    // }
+    // Check for win trigger (power switch flipped)
+    if (uart_input.isWinRequested()) {
+        game.triggerWin();
+    }
 
     // Update game logic
     game.update();

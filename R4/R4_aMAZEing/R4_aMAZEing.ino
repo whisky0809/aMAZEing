@@ -2,14 +2,21 @@
 #include <Mouse.h>
 
 /*
-  Pico expects 8-byte binary packets:
-    AA 55 Xlo Xhi Ylo Yhi mask checksum(XOR 0..6)
+  R4 Controller for aMAZEing maze game.
 
-  Two-mode system:
-  - PROTOPIE_MODE: Joystick = mouse cursor, D6 = left click, maze frozen
-  - MAZE_MODE: Joystick = maze control, mouse frozen
+  UART Protocol: 8-byte binary packets to Pico
+    [0xAA][0x55][Xlo][Xhi][Ylo][Yhi][mask][checksum]
 
-  D9 toggles between modes. After valid maze move, auto-switches to PROTOPIE_MODE.
+  Control Modes:
+  - PROTOPIE_MODE: Joystick controls mouse cursor, D6 = left click
+  - MAZE_ARMED: Joystick controls maze movement (turn-based)
+
+  State Flow:
+    PROTOPIE <-> MAZE_ARMED           (D9 toggle)
+    MAZE_ARMED -> PULSING -> ACK -> PROTOPIE  (after valid/goal move)
+    MAZE_ARMED -> PULSING -> ACK -> MAZE_ARMED (after invalid move, retry)
+
+  Buttons: A/B/C/D send keyboard letters, ENTER sends return key
 */
 
 /// ---------- Pins ----------
@@ -176,8 +183,14 @@ void loop() {
   // 1. Power Switch Logic
   bool powerIsOff = (digitalRead(SW_POWER) == POWER_OFF_LEVEL);
   if (powerIsOff && !powerWasOff) {
+    // Power switched OFF -> Win trigger
     Keyboard.write('o');
-    Serial.println("[POWER] OFF -> sent 'o'");
+    Serial1.write('o');  // Tell Pico to show win screen
+    Serial.println("[POWER] OFF -> win trigger");
+  } else if (!powerIsOff && powerWasOff) {
+    // Power switched ON -> Reset game
+    Serial1.write('R');  // Tell Pico to reset
+    Serial.println("[POWER] ON -> reset");
   }
   powerWasOff = powerIsOff;
 
@@ -202,10 +215,10 @@ void loop() {
     lastEnter = now;
     Serial.println("[KEY] ENTER");
   }
-  if (digitalRead(BTN_A) == LOW && (now - lastA >= BTN_DEBOUNCE_MS)) { tapABCD('A'); lastA = now; }
-  if (digitalRead(BTN_B) == LOW && (now - lastB >= BTN_DEBOUNCE_MS)) { tapABCD('B'); lastB = now; }
-  if (digitalRead(BTN_C) == LOW && (now - lastC >= BTN_DEBOUNCE_MS)) { tapABCD('C'); lastC = now; }
-  if (digitalRead(BTN_D) == LOW && (now - lastD >= BTN_DEBOUNCE_MS)) { tapABCD('D'); lastD = now; }
+  if (digitalRead(BTN_A) == LOW && (now - lastA >= BTN_DEBOUNCE_MS)) { tapABCD('A'); lastA = now; Serial.println("[KEY] A"); }
+  if (digitalRead(BTN_B) == LOW && (now - lastB >= BTN_DEBOUNCE_MS)) { tapABCD('B'); lastB = now; Serial.println("[KEY] B"); }
+  if (digitalRead(BTN_C) == LOW && (now - lastC >= BTN_DEBOUNCE_MS)) { tapABCD('C'); lastC = now; Serial.println("[KEY] C"); }
+  if (digitalRead(BTN_D) == LOW && (now - lastD >= BTN_DEBOUNCE_MS)) { tapABCD('D'); lastD = now; Serial.println("[KEY] D"); }
 
   // 4. D9 Mode Toggle Handler
   if (digitalRead(BTN_TOGGLE) == LOW && (now - lastToggle >= BTN_DEBOUNCE_MS)) {
@@ -260,8 +273,9 @@ void loop() {
           pulseDir = dirNow;
           pulseStartMs = now;
           pulsingMove = true;
+          static const char* dirNames[] = {"NEUTRAL", "LEFT", "RIGHT", "UP", "DOWN"};
           Serial.print("[MAZE] Move triggered: ");
-          Serial.println((int)pulseDir);
+          Serial.println(dirNames[pulseDir]);
         }
         lastDir = dirNow;
       }

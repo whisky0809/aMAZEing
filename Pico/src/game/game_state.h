@@ -11,7 +11,8 @@
 enum GameMode {
     STATE_START,
     STATE_PLAYING,
-    STATE_GOAL_MESSAGE  // Showing "A little bit more" rainbow text
+    STATE_GOAL_MESSAGE,  // Showing "A little bit more" rainbow text
+    STATE_WIN            // Showing win screen (player escaped)
 };
 
 // Move result for R4 acknowledgment
@@ -39,6 +40,7 @@ private:
     SpriteInstance goal_sprite;  // Animated goal sprite
 
     uint8_t active_player;     // 0 or 1 (whose turn)
+    uint8_t winner;            // 0 or 1 (who escaped)
     MoveResult lastMoveResult; // Result of last move attempt
     uint32_t goalMessageStart; // Timer for goal message display
 
@@ -57,6 +59,7 @@ private:
     void drawGoalBarrier(DisplayManager* display, uint8_t gx, uint8_t gy, const Player& p);
     void renderStartScreen(DisplayManager* display);
     void renderGoalMessage(DisplayManager* display);  // "A little bit more" rainbow
+    void renderWinScreen(DisplayManager* display);    // Player escaped
     bool isAdjacent(const Player& p, uint8_t gx, uint8_t gy);
     bool canReachGoal(const Player& p, uint8_t gx, uint8_t gy);
     uint16_t getGoalColorForDistance(uint8_t min_distance);
@@ -71,6 +74,9 @@ public:
     uint8_t getActivePlayer();
     uint16_t getPlayerMoves(uint8_t player_id);
     bool isStartScreen() { return state == STATE_START; }
+
+    // Win trigger (called when power switch is flipped)
+    void triggerWin();
 
     // Move result for R4 communication
     MoveResult getLastMoveResult();

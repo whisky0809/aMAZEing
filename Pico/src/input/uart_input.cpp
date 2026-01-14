@@ -11,7 +11,7 @@ static const unsigned long DIRECTION_DEBOUNCE_MS = 110;
 UARTInput::UARTInput()
     : packet_idx(0)
     , reset_requested(false)
-    // , mode_toggle_requested(false)  // Disabled - always 2-player
+    , win_requested(false)
     , last_direction(DIR_NONE)
     , last_direction_time(0)
 {
@@ -85,6 +85,13 @@ Direction UARTInput::getCommand() {
                 Serial.println("[UART] Reset command");
 #endif
                 reset_requested = true;
+                continue;
+            }
+            if (byte == 'o') {
+#if UART_DEBUG_LEVEL >= 1
+                Serial.println("[UART] Win command");
+#endif
+                win_requested = true;
                 continue;
             }
         }
@@ -162,11 +169,10 @@ bool UARTInput::isResetRequested() {
     return false;
 }
 
-// Disabled - always 2-player mode
-// bool UARTInput::isToggleModeRequested() {
-//     if (mode_toggle_requested) {
-//         mode_toggle_requested = false;
-//         return true;
-//     }
-//     return false;
-// }
+bool UARTInput::isWinRequested() {
+    if (win_requested) {
+        win_requested = false;
+        return true;
+    }
+    return false;
+}

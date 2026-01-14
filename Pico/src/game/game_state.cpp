@@ -6,6 +6,7 @@
 
 GameState::GameState() {
     active_player = 0;
+    winner = 0;
     state = STATE_START;
     lastMoveResult = MOVE_NONE;
     goalMessageStart = 0;
@@ -15,11 +16,6 @@ void GameState::init() {
     state = STATE_START;
     lastMoveResult = MOVE_NONE;  // Clear any stale move result
 }
-
-// Disabled - always 2-player mode
-// void GameState::setTwoPlayerMode(bool enable) {
-//     two_player_mode = enable;
-// }
 
 uint8_t GameState::getActivePlayer() {
     return active_player;
@@ -67,13 +63,11 @@ void GameState::resetGame() {
     Serial.println("DEBUG: P1 initialized");
     #endif
 
-    // Always 2-player mode
-    // if (two_player_mode) {
+    // Initialize Player 2 at a different position
     #ifdef DEBUG_MODE
     Serial.println("DEBUG: Setting up Player 2...");
     #endif
-    // Initialize Player 2 at DIFFERENT position
-        uint8_t sx2, sy2;
+    uint8_t sx2, sy2;
         int dist_sq_p2;
         int p2_attempts = 0;
         do {
@@ -105,7 +99,6 @@ void GameState::resetGame() {
     #ifdef DEBUG_MODE
     Serial.println("DEBUG: P2 initialized");
     #endif
-    // } // End of two_player_mode block (disabled)
 
     #ifdef DEBUG_MODE
     Serial.println("DEBUG: Picking goal position...");
@@ -209,45 +202,6 @@ void GameState::handleInput(Direction dir) {
     }
 }
 
-// Disabled - always 2-player mode
-// void GameState::handleSinglePlayerMove(Direction dir) {
-//     Player& p = players[0];
-//
-//     #ifdef DEBUG_MODE
-//     // Debug: Show what directions are available
-//     Serial.print("Input: ");
-//     Serial.print(dir == NORTH ? "N" : dir == SOUTH ? "S" : dir == EAST ? "E" : dir == WEST ? "W" : "?");
-//     Serial.print(" | Pos: (");
-//     Serial.print(p.x);
-//     Serial.print(",");
-//     Serial.print(p.y);
-//     Serial.print(") | Available: ");
-//     if (p.current_cell_dirs & (1 << NORTH)) Serial.print("N");
-//     if (p.current_cell_dirs & (1 << SOUTH)) Serial.print("S");
-//     if (p.current_cell_dirs & (1 << EAST)) Serial.print("E");
-//     if (p.current_cell_dirs & (1 << WEST)) Serial.print("W");
-//     #endif
-//
-//     if (isValidMove(p, dir)) {
-//         movePlayer(p, dir);
-//         p.moves++;
-//         maze.generateNewDirections(p.x, p.y);
-//         p.current_cell_dirs = maze.getCurrentDirections();
-//         #ifdef DEBUG_MODE
-//         Serial.println(" -> MOVED");
-//         #endif
-//
-//         if (maze.isGoal(p.x, p.y)) {
-//             state = STATE_WIN;
-//             winner = 0;
-//         }
-//     } else {
-//         #ifdef DEBUG_MODE
-//         Serial.println(" -> BLOCKED");
-//         #endif
-//     }
-// }
-
 void GameState::handleTwoPlayerMove(Direction dir) {
     Player& p = players[active_player];
 
@@ -283,6 +237,16 @@ MoveResult GameState::getLastMoveResult() {
     MoveResult result = lastMoveResult;
     lastMoveResult = MOVE_NONE;  // Clear after read
     return result;
+}
+
+void GameState::triggerWin() {
+    if (state == STATE_PLAYING || state == STATE_GOAL_MESSAGE) {
+        winner = active_player;  // Current player wins (escaped)
+        state = STATE_WIN;
+        Serial.print("[GAME] Player ");
+        Serial.print(winner + 1);
+        Serial.println(" wins!");
+    }
 }
 
 bool GameState::isValidMove(const Player& p, Direction dir) {
@@ -327,6 +291,8 @@ void GameState::render(DisplayManager* display) {
         renderStartScreen(display);
     } else if (state == STATE_GOAL_MESSAGE) {
         renderGoalMessage(display);
+    } else if (state == STATE_WIN) {
+        renderWinScreen(display);
     } else {
         // STATE_PLAYING
         renderStatusBar(display);
@@ -347,19 +313,6 @@ void GameState::renderStatusBar(DisplayManager* display) {
     display->print(active_player + 1);
     display->print(" TURN");
 }
-
-// Disabled - always 2-player mode
-// void GameState::renderSinglePlayer(DisplayManager* display) {
-//     // 1. Render fog (blue borders for accessible cells)
-//     renderPlayerFog(display, players[0], PATH_COLOR);
-//     // 2. Render blocked indicators (red lines on blocked cells)
-//     renderBlockedDirections(display, players[0]);
-//     // 3. Render goal
-//     renderGoal(display);
-//     // 4. Render player sprite
-//     SpriteRenderer::draw(display, &players[0].sprite,
-//                          players[0].x * CELL_SIZE, players[0].y * CELL_SIZE);
-// }
 
 void GameState::renderTwoPlayer(DisplayManager* display) {
     // 1. Render Player 1's fog-of-war (blue)
@@ -574,16 +527,6 @@ void GameState::renderStartScreen(DisplayManager* display) {
     display->setCursor(cursorX, cursorY);
     display->print(TEXT_TITLE_L2_SUF);
 
-    // Mode Indicator - always 2-player
-    display->setTextColor(PLAYER2_COLOR);
-    display->setCursor(8, 35);
-    display->print(TEXT_MODE_2P);
-
-    // Toggle Instruction - disabled (always 2-player)
-    // display->setTextColor(0xAAAA); // Light Gray
-    // display->setCursor(10, 45);
-    // display->print(TEXT_TOGGLE_BTN);
-
     // Footer
     display->setTextColor(GOAL_COLOR);
     display->setCursor(4, 55);
@@ -611,8 +554,8 @@ void GameState::renderGoalMessage(DisplayManager* display) {
     // Helper buffer for single character printing
     char buf[2] = {0, 0};
 
-    // "A little" - Line 1 (centered)
-    const char* line1 = "A little";
+    // Line 1 (centered)
+    const char* line1 = TEXT_GOAL_L1;
     int16_t x1 = (64 - 8 * 6) / 2;  // 8 chars * 6px = 48px, center
     display->setCursor(x1, 18);
     for (int i = 0; line1[i] != '\0'; i++) {
@@ -622,8 +565,8 @@ void GameState::renderGoalMessage(DisplayManager* display) {
         display->print(buf);
     }
 
-    // "bit more" - Line 2 (centered)
-    const char* line2 = "bit more";
+    // Line 2 (centered)
+    const char* line2 = TEXT_GOAL_L2;
     int16_t x2 = (64 - 8 * 6) / 2;  // 8 chars * 6px = 48px, center
     display->setCursor(x2, 32);
     for (int i = 0; line2[i] != '\0'; i++) {
@@ -632,4 +575,32 @@ void GameState::renderGoalMessage(DisplayManager* display) {
         buf[0] = line2[i];
         display->print(buf);
     }
+}
+
+void GameState::renderWinScreen(DisplayManager* display) {
+    display->setTextSize(1);
+
+    // Line 1: "P1 ESCAPED!" or "P2 ESCAPED!" (winner in their color)
+    display->setCursor(4, 4);
+    display->setTextColor(players[winner].color);
+    display->print("P");
+    display->print(winner + 1);
+    display->print(TEXT_WIN_ESCAPED);
+
+    // Line 2: "P2 wants" or "P1 wants" (other player)
+    uint8_t other = 1 - winner;
+    display->setCursor(10, 18);
+    display->setTextColor(players[other].color);
+    display->print("P");
+    display->print(other + 1);
+    display->print(TEXT_WIN_WANTS);
+
+    // Lines 3-5: "one more / rabbit / hole..." (white)
+    display->setTextColor(0xFFFF);
+    display->setCursor(8, 30);
+    display->print(TEXT_WIN_L3);
+    display->setCursor(14, 42);
+    display->print(TEXT_WIN_L4);
+    display->setCursor(10, 54);
+    display->print(TEXT_WIN_L5);
 }

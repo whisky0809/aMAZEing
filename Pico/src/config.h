@@ -79,23 +79,22 @@
 #define TURN_INDICATOR_X 56
 #define TURN_INDICATOR_Y 2
 
-// UI Text Constants
+// UI Text Constants (Start Screen)
 #define TEXT_TITLE_L1       "It's"
 #define TEXT_TITLE_L2_PRE   "a"
 #define TEXT_TITLE_L2_MAIN  "MAZE"
 #define TEXT_TITLE_L2_SUF   "ing"
+#define TEXT_PRESS_KEY      "PRESS A"
 
-#define TEXT_MODE_1P        "1 PLAYER"
-#define TEXT_MODE_2P        "2 PLAYER"
-#define TEXT_TOGGLE_BTN     "T: MODE"
+// Goal Message Text (shown when goal is reached)
+#define TEXT_GOAL_L1        "A little"
+#define TEXT_GOAL_L2        "bit more"
 
-#define TEXT_PRESS_KEY      "PRESS A+JOY"
-#define TEXT_TO_START       "TO START"
-#define TEXT_YOU_WIN        "YOU WIN!"
-#define TEXT_MOVES_LABEL    "MOVES:"
-#define TEXT_PLAYER_PREFIX  "PLAYER "
-#define TEXT_WINS_SUFFIX    "WINS!"
-#define TEXT_P1_LABEL       "P1:"
-#define TEXT_P2_LABEL       "P2:"
+// Win Screen Text (shown when power switch triggers win)
+#define TEXT_WIN_ESCAPED    " ESCAPED!"  // Prefixed with P1/P2
+#define TEXT_WIN_WANTS      " wants"     // Prefixed with P2/P1 (other player)
+#define TEXT_WIN_L3         "one more"
+#define TEXT_WIN_L4         "rabbit"
+#define TEXT_WIN_L5         "hole..."
 
 #endif // CONFIG_H
