@@ -42,7 +42,7 @@ Row 8-63:  MAZE AREA (7x8 Grid, 8x8 pixels per cell)
 
 ## Hardware Setup
 
-See `PINOUT.md` for detailed wiring.
+See `../PINOUT.md` for detailed wiring.
 
 ## Building & Uploading
 

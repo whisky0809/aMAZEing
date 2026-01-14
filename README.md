@@ -42,7 +42,7 @@ graph LR
 
 ## Quick Start Guide
 
-1.  **Hardware Setup**: Connect components as per `Pico/PINOUT.md` and R4 wiring.
+1.  **Hardware Setup**: Connect components as per `PINOUT.md`.
 2.  **Flash Pico**:
     -   Open `Pico/` in PlatformIO.
     -   Upload firmware to Raspberry Pi Pico W.
