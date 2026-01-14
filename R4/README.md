@@ -12,18 +12,18 @@ This firmware runs on the **Arduino UNO R4 WiFi** and acts as the central contro
 
 | Component | R4 Pin | Notes |
 |-----------|--------|-------|
-| **Joystick X** | A0 | Analog |
-| **Joystick Y** | A1 | Analog |
-| **Joystick SW (D6)**| 9 | Digital Pullup, Left Click in mouse mode |
-| **BTN_A** | 2 | Send 'A' to ProtoPie |
-| **BTN_B** | 3 | Send 'B' to ProtoPie |
-| **BTN_C** | 4 | Send 'C' to ProtoPie |
-| **BTN_D** | 5 | Send 'D' to ProtoPie |
-| **BTN_ENTER (D7)** | 7 | Start game + send ENTER to ProtoPie |
-| **SW_POWER** | 8 | Win trigger on OFF edge, Reset on ON edge |
-| **BTN_TOGGLE (D9)** | 6 | Hold for maze control |
-| **UART TX** | 1 (TX) | To Pico RX (GP17) |
-| **UART RX** | 0 (RX) | To Pico TX (GP16) |
+| **Jx** | A0 | Joystick X-axis analog |
+| **Jy** | A1 | Joystick Y-axis analog |
+| **Jsw** | D6 | Joystick switch, left click in mouse mode |
+| **A** | D2 | Send 'A' to ProtoPie |
+| **B** | D3 | Send 'B' to ProtoPie |
+| **C** | D4 | Send 'C' to ProtoPie |
+| **D** | D5 | Send 'D' to ProtoPie |
+| **Enter** | D7 | Start game + send ENTER to ProtoPie |
+| **Power Switch** | D8 | Win trigger on OFF, Reset on ON |
+| **Toggle** | D9 | Hold for maze control |
+| **UART TX** | D1 | To Pico GP17 (RX) |
+| **UART RX** | D0 | From Pico GP16 (TX) |
 
 ## Control Modes
 

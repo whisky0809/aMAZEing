@@ -18,29 +18,29 @@ Complete pinout for the aMAZEing maze game system.
 ### Joystick
 | Signal | R4 Pin | Notes |
 |--------|--------|-------|
-| **VRX** | A0 | X-axis analog |
-| **VRY** | A1 | Y-axis analog |
-| **SW (D6)** | 9 | Joystick switch, left click in mouse mode |
+| **Jx** | A0 | X-axis analog |
+| **Jy** | A1 | Y-axis analog |
+| **Jsw** | D6 | Joystick switch, left click in mouse mode |
 | **VCC** | 5V | |
 | **GND** | GND | |
 
 ### Buttons
 | Button | R4 Pin | Function |
 |--------|--------|----------|
-| **BTN_A** | 2 | Send 'A' to ProtoPie |
-| **BTN_B** | 3 | Send 'B' to ProtoPie |
-| **BTN_C** | 4 | Send 'C' to ProtoPie |
-| **BTN_D** | 5 | Send 'D' to ProtoPie |
-| **BTN_TOGGLE (D9)** | 6 | Hold for maze control |
-| **BTN_ENTER (D7)** | 7 | Start game + ENTER key |
-| **SW_POWER** | 8 | Win on OFF, Reset on ON |
+| **A** | D2 | Send 'A' to ProtoPie |
+| **B** | D3 | Send 'B' to ProtoPie |
+| **C** | D4 | Send 'C' to ProtoPie |
+| **D** | D5 | Send 'D' to ProtoPie |
+| **Enter** | D7 | Start game + ENTER key |
+| **Power Switch** | D8 | Win on OFF, Reset on ON |
+| **Toggle** | D9 | Hold for maze control |
 
 ### UART (to Pico)
-| Signal | R4 Pin | Pico Pin | Notes |
-|--------|--------|----------|-------|
-| **TX** | 1 (TX) | GP17 (RX) | R4 sends commands to Pico |
-| **RX** | 0 (RX) | GP16 (TX) | Pico sends V/I/G responses |
-| **GND** | GND | GND | Common ground (critical!) |
+| R4 Pin | Pico Pin | Notes |
+|--------|----------|-------|
+| **D0 (RX)** | GP16 (TX) | Pico sends V/I/G responses to R4 |
+| **D1 (TX)** | GP17 (RX) | R4 sends commands to Pico |
+| **GND** | GND | Common ground (critical!) |
 
 ---
 
