@@ -3,9 +3,10 @@
 Procedurally-generated maze navigation game for Raspberry Pi Pico W, designed to be controlled by an external Arduino UNO R4 WiFi via UART.
 
 ## Features
-- **Turn-Based Gameplay**: Players alternate turns (Move -> Minigame -> Move).
-- **Status Bar**: Top 8 pixels show current player turn and hints.
-- **Bidirectional UART**: Sends move validation (Valid/Invalid/Win) back to controller.
+- **Two-Player Turn-Based**: Players alternate turns, one move per turn.
+- **Hold-to-Control**: Maze only responds when D9 is held on the R4 controller.
+- **Status Bar**: Shows "MiniWait" (D9 released) or "P1 GO!"/"P2 GO!" (D9 held).
+- **Bidirectional UART**: Sends move validation back to controller.
 - **64x64 HUB75 Matrix**: High-refresh rate display.
 
 ## Display Layout
@@ -13,7 +14,7 @@ Procedurally-generated maze navigation game for Raspberry Pi Pico W, designed to
 The 64x64 matrix is divided into two regions:
 
 ```
-Row 0-7:   STATUS BAR (Text: "P1 TURN", "P2 TURN", etc.)
+Row 0-7:   STATUS BAR (Text: "MiniWait", "P1 GO!", "P2 GO!")
 Row 8-63:  MAZE AREA (7x8 Grid, 8x8 pixels per cell)
 ```
 
@@ -25,15 +26,19 @@ Row 8-63:  MAZE AREA (7x8 Grid, 8x8 pixels per cell)
 - **Baud**: 115200
 
 **R4 -> Pico Commands (Single Byte)**:
-- `R`: Reset Game (Restart, P1 start)
+- `s`: Start Game (from start screen)
+- `R`: Reset Game (restart to start screen)
+- `o`: Win Trigger (power switch flipped)
+- `H`: D9 Held (maze control active)
+- `U`: D9 Unheld (maze control released)
 
 **R4 -> Pico Commands (Binary Packet)**:
-- 8-byte packet with Joystick X/Y and Button Mask.
+- 8-byte packet: `[0xAA][0x55][Xlo][Xhi][Ylo][Yhi][mask][checksum]`
 
 **Pico -> R4 Responses (Single Byte)**:
-- `V`: Move Valid (Player moved successfully)
-- `I`: Move Invalid (Hit wall/boundary)
-- `W`: Win (Player reached goal)
+- `V`: Move Valid (player moved successfully)
+- `I`: Move Invalid (hit wall/boundary)
+- `G`: Goal Reached (goal relocates, game continues)
 
 ## Hardware Setup
 

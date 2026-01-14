@@ -47,7 +47,7 @@ graph LR
     -   Open `Pico/` in PlatformIO.
     -   Upload firmware to Raspberry Pi Pico W.
 3.  **Flash R4**:
-    -   Open `R4/R4_PICO_LATEST.ino` in Arduino IDE.
+    -   Open `R4/R4_aMAZEing/R4_aMAZEing.ino` in Arduino IDE.
     -   Select "Arduino UNO R4 WiFi".
     -   Upload firmware.
 4.  **ProtoPie**:
@@ -55,9 +55,9 @@ graph LR
 5.  **Play**:
     -   Connect R4 to iPad via USB (adapter required).
     -   Power up the Matrix/Pico.
-    -   Press **BTN_A** to start a turn on the Maze.
-    -   Move Joystick to navigate.
-    -   When minigame appears, use Joystick as mouse.
+    -   Press **D7 (ENTER)** to start the game.
+    -   Hold **D9** to control the maze, tilt joystick to move.
+    -   Release **D9** to return to mouse mode for minigames.
 
 ## Folder Structure
 
