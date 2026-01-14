@@ -76,6 +76,10 @@ static uint32_t lastToggle = 0;  // D9 mode toggle debounce
 static const int POWER_OFF_LEVEL = HIGH;
 static bool powerWasOff = false;
 
+/// ---------- Game start sequence ----------
+static bool enterPressed = false;      // ENTER has been pressed at least once
+static bool firstClickConsumed = false; // First D6 click after ENTER has triggered maze mode
+
 /// ---------- One-move pulse ----------
 static const uint16_t MOVE_PULSE_MS   = 70;
 static const uint16_t NEUTRAL_HOLD_MS = 40; // Not strictly used in new ACK mode but kept for safety
@@ -213,6 +217,7 @@ void loop() {
   if (digitalRead(BTN_ENTER) == LOW && (now - lastEnter >= BTN_DEBOUNCE_MS)) {
     Keyboard.write(KEY_RETURN);
     lastEnter = now;
+    enterPressed = true;  // Mark that game sequence has started
     Serial.println("[KEY] ENTER");
   }
   if (digitalRead(BTN_A) == LOW && (now - lastA >= BTN_DEBOUNCE_MS)) { tapABCD('A'); lastA = now; Serial.println("[KEY] A"); }
@@ -249,6 +254,14 @@ void loop() {
         Mouse.click(MOUSE_LEFT);
         lastClick = now;
         Serial.println("[CLICK] Left");
+
+        // First click after ENTER also switches to MAZE_ARMED
+        if (enterPressed && !firstClickConsumed) {
+          firstClickConsumed = true;
+          state = MAZE_ARMED;
+          lastDir = DIR_NEUTRAL;
+          Serial.println("[MODE] -> MAZE (first click)");
+        }
       }
       // Keep Pico Maze Frozen
       if (now - lastSendMs >= SEND_PERIOD_MS) {
