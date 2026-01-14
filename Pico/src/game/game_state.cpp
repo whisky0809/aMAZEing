@@ -199,6 +199,10 @@ void GameState::handleInput(Direction dir) {
         case STATE_GOAL_MESSAGE:
             // Ignore input during goal message display
             break;
+
+        case STATE_WIN:
+            // Ignore input on win screen (reset via power switch)
+            break;
     }
 }
 
@@ -225,7 +229,7 @@ void GameState::handleTwoPlayerMove(Direction dir) {
             return;
         }
 
-        // Switch turns (toggle between 0 and 1)
+        // Valid move: switch turns (stay in STATE_PLAYING)
         active_player = 1 - active_player;
         lastMoveResult = MOVE_VALID;
     } else {
@@ -284,7 +288,7 @@ void GameState::update() {
     }
 }
 
-void GameState::render(DisplayManager* display) {
+void GameState::render(DisplayManager* display, bool d9_held) {
     display->clear();
 
     if (state == STATE_START) {
@@ -295,23 +299,29 @@ void GameState::render(DisplayManager* display) {
         renderWinScreen(display);
     } else {
         // STATE_PLAYING
-        renderStatusBar(display);
+        renderStatusBar(display, d9_held);
         renderTwoPlayer(display);
     }
 
     display->update();
 }
 
-void GameState::renderStatusBar(DisplayManager* display) {
+void GameState::renderStatusBar(DisplayManager* display, bool d9_held) {
     display->fillRect(0, 0, 64, STATUS_BAR_HEIGHT, 0x0000);  // Clear bar
     display->setTextSize(1);
-    
-    // Simple text for now: "P1" or "P2"
     display->setCursor(2, 0);
-    display->setTextColor(players[active_player].color);
-    display->print("P");
-    display->print(active_player + 1);
-    display->print(" TURN");
+
+    if (d9_held) {
+        // D9 held: show active player turn indicator
+        display->setTextColor(players[active_player].color);
+        display->print("P");
+        display->print(active_player + 1);
+        display->print(" GO!");
+    } else {
+        // D9 not held: show "MiniWait" message
+        display->setTextColor(0xFFFF);  // White
+        display->print("MiniWait");
+    }
 }
 
 void GameState::renderTwoPlayer(DisplayManager* display) {

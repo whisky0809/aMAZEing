@@ -2,8 +2,7 @@
 #include "uart_input.h"
 
 // Debounce time between direction changes (ms)
-// 150ms can feel a bit slow; 110ms is snappier but still stable
-static const unsigned long DIRECTION_DEBOUNCE_MS = 110;
+static const unsigned long DIRECTION_DEBOUNCE_MS = 150;
 
 // Debug levels: 0 = off, 1 = important events only, 2 = verbose (every packet)
 #define UART_DEBUG_LEVEL 1
@@ -12,14 +11,16 @@ UARTInput::UARTInput()
     : packet_idx(0)
     , reset_requested(false)
     , win_requested(false)
+    , start_requested(false)
+    , d9_held(false)
     , last_direction(DIR_NONE)
     , last_direction_time(0)
 {
 }
 
 void UARTInput::init() {
-    // You are using GP16 (TX) and GP17 (RX) on Pico W.
-    // Those pins are UART0 alternate pins -> use Serial1 (UART0).
+    // GP16 (TX) and GP17 (RX)
+    // pins are UART0 alternate pins -> use Serial1 (UART0).
     Serial1.setTX(UART_TX_PIN);   // GP16
     Serial1.setRX(UART_RX_PIN);   // GP17
     Serial1.begin(UART_BAUD);
@@ -92,6 +93,27 @@ Direction UARTInput::getCommand() {
                 Serial.println("[UART] Win command");
 #endif
                 win_requested = true;
+                continue;
+            }
+            if (byte == 's') {
+#if UART_DEBUG_LEVEL >= 1
+                Serial.println("[UART] Start command");
+#endif
+                start_requested = true;
+                continue;
+            }
+            if (byte == 'H') {
+#if UART_DEBUG_LEVEL >= 1
+                Serial.println("[UART] D9 Held");
+#endif
+                d9_held = true;
+                continue;
+            }
+            if (byte == 'U') {
+#if UART_DEBUG_LEVEL >= 1
+                Serial.println("[UART] D9 Unheld");
+#endif
+                d9_held = false;
                 continue;
             }
         }
@@ -172,6 +194,14 @@ bool UARTInput::isResetRequested() {
 bool UARTInput::isWinRequested() {
     if (win_requested) {
         win_requested = false;
+        return true;
+    }
+    return false;
+}
+
+bool UARTInput::isStartRequested() {
+    if (start_requested) {
+        start_requested = false;
         return true;
     }
     return false;

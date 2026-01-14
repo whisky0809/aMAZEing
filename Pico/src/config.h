@@ -20,7 +20,7 @@
 //   GP11 = LATCH, GP12 = OE (Output Enable), GP13 = CLK (Clock)
 
 // UART pins for R4 communication (UART0 on GP16/GP17)
-#define UART_TX_PIN  16      // GP16 (optional, for sending back to R4)
+#define UART_TX_PIN  16      // GP16 Sends back to R4
 #define UART_RX_PIN  17      // GP17 receives from R4 TX
 #define UART_BAUD    115200
 
@@ -59,10 +59,10 @@
 #define START_Y        0
 
 // Two-player colors (RGB565)
-#define PLAYER1_COLOR  0xF800  // Red (reuse existing PLAYER_COLOR)
-#define PLAYER2_COLOR  0x07FF  // Cyan (high contrast with red)
-#define P1_FOG_COLOR   0x001F  // Blue (reuse PATH_COLOR)
-#define P2_FOG_COLOR   0x780F  // Purple (distinct from blue)
+#define PLAYER1_COLOR  0x5F0B  // Green
+#define PLAYER2_COLOR  0xF800  // Magenta/Red
+#define P1_FOG_COLOR   0x001F  // Blue
+#define P2_FOG_COLOR   0x780F  // Purple
 #define ACTIVE_HIGHLIGHT 0xFFFF // White border for active player
 
 // Goal distance color progression (RGB565) - heat map: red=far, green=close
@@ -84,7 +84,7 @@
 #define TEXT_TITLE_L2_PRE   "a"
 #define TEXT_TITLE_L2_MAIN  "MAZE"
 #define TEXT_TITLE_L2_SUF   "ing"
-#define TEXT_PRESS_KEY      "PRESS A"
+#define TEXT_PRESS_KEY      "Press red"
 
 // Goal Message Text (shown when goal is reached)
 #define TEXT_GOAL_L1        "A little"
@@ -96,5 +96,11 @@
 #define TEXT_WIN_L3         "one more"
 #define TEXT_WIN_L4         "rabbit"
 #define TEXT_WIN_L5         "hole..."
+
+// Minigame Prompt Text (shown after valid move)
+#define TEXT_MINIGAME_L1    "Press"
+#define TEXT_MINIGAME_L2    "round"
+#define TEXT_MINIGAME_L3    "green"
+#define TEXT_MINIGAME_L4    "button"
 
 #endif // CONFIG_H

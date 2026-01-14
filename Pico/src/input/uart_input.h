@@ -15,6 +15,10 @@ private:
     // One-shot command flags
     bool reset_requested;
     bool win_requested;
+    bool start_requested;
+
+    // D9 held state (for maze control)
+    bool d9_held;
 
     // Direction debouncing
     Direction last_direction;
@@ -33,6 +37,8 @@ public:
     Direction getCommand();
     bool isResetRequested();
     bool isWinRequested();
+    bool isStartRequested();
+    bool isD9Held() const { return d9_held; }
 };
 
 #endif // UART_INPUT_H

@@ -9,14 +9,15 @@
 
   Control Modes:
   - PROTOPIE_MODE: Joystick controls mouse cursor, D6 = left click
-  - MAZE_ARMED: Joystick controls maze movement (turn-based)
+  - MAZE_HELD: D9 held - joystick controls maze (one move per hold)
 
   State Flow:
-    PROTOPIE <-> MAZE_ARMED           (D9 toggle)
-    MAZE_ARMED -> PULSING -> ACK -> PROTOPIE  (after valid/goal move)
-    MAZE_ARMED -> PULSING -> ACK -> MAZE_ARMED (after invalid move, retry)
+    - D7 (ENTER) starts the game (sends 's' to Pico)
+    - D9 held: switches to MAZE_HELD, sends 'H' to Pico
+    - Make one move with joystick (direction packet sent)
+    - D9 released: sends 'U' to Pico, 't' to ProtoPie if move was made
 
-  Buttons: A/B/C/D send keyboard letters, ENTER sends return key
+  Buttons: A/B/C/D send keyboard letters, ENTER starts game + sends return key
 */
 
 /// ---------- Pins ----------
@@ -57,9 +58,7 @@ static const uint8_t H1 = 0x55;
 /// ---------- Mode State ----------
 enum ControlState {
   PROTOPIE_MODE,     // Joystick = mouse, D6 = left click, maze frozen
-  MAZE_ARMED,        // Joystick = maze control, waiting for direction
-  MAZE_PULSING,      // Sending move pulse to Pico
-  WAITING_ACK        // Waiting for Pico's V/I/G response
+  MAZE_HELD          // D9 held - joystick controls maze (one move per hold)
 };
 static ControlState state = PROTOPIE_MODE;
 
@@ -69,27 +68,22 @@ static uint32_t lastMouseMs = 0;
 static uint32_t lastA=0, lastB=0, lastC=0, lastD=0;
 static uint32_t lastEnter = 0;
 static uint32_t lastClick = 0;   // D6 left click debounce
-static uint32_t lastToggle = 0;  // D9 mode toggle debounce
 
 
 /// ---------- Power switch ----------
 static const int POWER_OFF_LEVEL = HIGH;
 static bool powerWasOff = false;
 
-/// ---------- Game start sequence ----------
-static bool enterPressed = false;      // ENTER has been pressed at least once
-static bool firstClickConsumed = false; // First D6 click after ENTER has triggered maze mode
+/// ---------- Game start ----------
+static bool gameStarted = false;  // Has the maze game been started?
 
-/// ---------- One-move pulse ----------
-static const uint16_t MOVE_PULSE_MS   = 70;
-static const uint16_t NEUTRAL_HOLD_MS = 40; // Not strictly used in new ACK mode but kept for safety
-
+/// ---------- D9 Hold Detection ----------
 enum Dir { DIR_NEUTRAL, DIR_LEFT, DIR_RIGHT, DIR_UP, DIR_DOWN };
 
-static bool pulsingMove  = false;
-static uint32_t pulseStartMs = 0;
+static bool d9_currently_held = false;      // Real-time D9 button state
+static bool move_made_this_hold = false;    // Has a valid move been made this hold cycle?
+static uint32_t lastD9Check = 0;            // For D9 polling interval
 static Dir lastDir = DIR_NEUTRAL;
-static Dir pulseDir = DIR_NEUTRAL;
 
 /// ---------- Helpers ----------
 static inline int applyDeadzone(int v) {
@@ -194,6 +188,8 @@ void loop() {
   } else if (!powerIsOff && powerWasOff) {
     // Power switched ON -> Reset game
     Serial1.write('R');  // Tell Pico to reset
+    gameStarted = false;  // Reset start state
+    state = PROTOPIE_MODE;
     Serial.println("[POWER] ON -> reset");
   }
   powerWasOff = powerIsOff;
@@ -208,35 +204,58 @@ void loop() {
   
   int cx = (int)rawX - CENTER;
   int cy = (int)rawY - CENTER;
-  int x = applyDeadzone(cx);
-  int y = applyDeadzone(cy);
+  // Joystick mounted rotated: swap axes (negation removed to fix inversion)
+  int x = applyDeadzone(cy);
+  int y = applyDeadzone(cx);
 
   uint8_t mask = 0;  // Button mask for Pico (not used for mode control)
 
   // 3. Global Button Handlers (A, B, C, D, Enter)
   if (digitalRead(BTN_ENTER) == LOW && (now - lastEnter >= BTN_DEBOUNCE_MS)) {
     Keyboard.write(KEY_RETURN);
+    if (!gameStarted) {
+      Serial1.write('s');  // Start game on Pico
+      gameStarted = true;
+      Serial.println("[ENTER] Game started");
+    } else {
+      Serial.println("[KEY] ENTER");
+    }
     lastEnter = now;
-    enterPressed = true;  // Mark that game sequence has started
-    Serial.println("[KEY] ENTER");
   }
   if (digitalRead(BTN_A) == LOW && (now - lastA >= BTN_DEBOUNCE_MS)) { tapABCD('A'); lastA = now; Serial.println("[KEY] A"); }
   if (digitalRead(BTN_B) == LOW && (now - lastB >= BTN_DEBOUNCE_MS)) { tapABCD('B'); lastB = now; Serial.println("[KEY] B"); }
   if (digitalRead(BTN_C) == LOW && (now - lastC >= BTN_DEBOUNCE_MS)) { tapABCD('C'); lastC = now; Serial.println("[KEY] C"); }
   if (digitalRead(BTN_D) == LOW && (now - lastD >= BTN_DEBOUNCE_MS)) { tapABCD('D'); lastD = now; Serial.println("[KEY] D"); }
 
-  // 4. D9 Mode Toggle Handler
-  if (digitalRead(BTN_TOGGLE) == LOW && (now - lastToggle >= BTN_DEBOUNCE_MS)) {
-    if (state == PROTOPIE_MODE) {
-      state = MAZE_ARMED;
-      lastDir = DIR_NEUTRAL;  // Reset direction tracking
-      Serial.println("[MODE] -> MAZE");
-    } else if (state == MAZE_ARMED) {
-      state = PROTOPIE_MODE;
-      Serial.println("[MODE] -> PROTOPIE");
+  // 4. D9 Hold Detection (poll every ~10ms)
+  if (now - lastD9Check >= 10) {
+    bool d9_pressed = (digitalRead(BTN_TOGGLE) == LOW);
+
+    if (d9_pressed && !d9_currently_held) {
+      // D9 just pressed down
+      d9_currently_held = true;
+      move_made_this_hold = false;  // Reset for new hold cycle
+      lastDir = DIR_NEUTRAL;        // Reset direction tracking
+      state = MAZE_HELD;
+      Serial1.write('H');  // Tell Pico D9 is held
+      Serial.println("[D9] HELD -> MAZE mode");
     }
-    // Don't toggle during MAZE_PULSING or WAITING_ACK
-    lastToggle = now;
+    else if (!d9_pressed && d9_currently_held) {
+      // D9 just released
+      d9_currently_held = false;
+      state = PROTOPIE_MODE;
+      Serial1.write('U');  // Tell Pico D9 released (Unheld)
+
+      // If a valid move was made this hold, notify ProtoPie of turn end
+      if (move_made_this_hold) {
+        Keyboard.write('t');  // Tell ProtoPie turn complete
+        Serial.println("[D9] RELEASED after move -> 't' to ProtoPie");
+      } else {
+        Serial.println("[D9] RELEASED (no move made)");
+      }
+    }
+
+    lastD9Check = now;
   }
 
   // 5. State Machine
@@ -254,14 +273,6 @@ void loop() {
         Mouse.click(MOUSE_LEFT);
         lastClick = now;
         Serial.println("[CLICK] Left");
-
-        // First click after ENTER also switches to MAZE_ARMED
-        if (enterPressed && !firstClickConsumed) {
-          firstClickConsumed = true;
-          state = MAZE_ARMED;
-          lastDir = DIR_NEUTRAL;
-          Serial.println("[MODE] -> MAZE (first click)");
-        }
       }
       // Keep Pico Maze Frozen
       if (now - lastSendMs >= SEND_PERIOD_MS) {
@@ -270,75 +281,32 @@ void loop() {
       }
       break;
 
-    case MAZE_ARMED:
-      // Mouse Frozen. Waiting for Joystick Direction.
-      // Send freeze packet to Pico
-      if (now - lastSendMs >= SEND_PERIOD_MS) {
-        sendPacket(CENTER, CENTER, mask);
-        lastSendMs = now;
-      }
-      
-      { 
+    case MAZE_HELD:
+      // D9 is held - waiting for joystick input
+      // Only allow one move per hold cycle
+      if (!move_made_this_hold) {
         Dir dirNow = getDirFromXY(x, y);
         // Trigger on Neutral -> Direction
         if (lastDir == DIR_NEUTRAL && dirNow != DIR_NEUTRAL) {
-          state = MAZE_PULSING;
-          pulseDir = dirNow;
-          pulseStartMs = now;
-          pulsingMove = true;
+          // Send direction packet to Pico
+          uint16_t px, py;
+          dirToRaw(dirNow, px, py);
+          sendPacket(px, py, mask);
+          move_made_this_hold = true;  // Block further moves until D9 released
           static const char* dirNames[] = {"NEUTRAL", "LEFT", "RIGHT", "UP", "DOWN"};
-          Serial.print("[MAZE] Move triggered: ");
-          Serial.println(dirNames[pulseDir]);
+          Serial.print("[MAZE] Move sent: ");
+          Serial.println(dirNames[dirNow]);
         }
         lastDir = dirNow;
       }
-      break;
 
-    case MAZE_PULSING:
-      // Send Direction Pulse for MOVE_PULSE_MS
+      // Keep sending neutral while D9 held (after move or while waiting)
       if (now - lastSendMs >= SEND_PERIOD_MS) {
-        uint16_t px, py;
-        dirToRaw(pulseDir, px, py);
-        sendPacket(px, py, mask);
+        if (!move_made_this_hold) {
+          // Still waiting for direction - send neutral
+          sendPacket(CENTER, CENTER, mask);
+        }
         lastSendMs = now;
-      }
-      // Timeout -> Go to WAITING_ACK
-      if (now - pulseStartMs >= MOVE_PULSE_MS) {
-        state = WAITING_ACK;
-        // Send neutral once to stop drift
-        sendPacket(CENTER, CENTER, mask);
-        Serial.println("[MAZE] Pulse done, waiting ACK...");
-      }
-      break;
-
-    case WAITING_ACK:
-      // Send Neutral to Pico while waiting
-      if (now - lastSendMs >= SEND_PERIOD_MS) {
-        sendPacket(CENTER, CENTER, mask);
-        lastSendMs = now;
-      }
-
-      // Check for Response
-      while (Serial1.available()) {
-        char c = Serial1.read();
-        if (c == 'V') {
-           // Valid Move - auto switch to ProtoPie mode
-           Keyboard.write('t'); // Tell ProtoPie (turn complete)
-           state = PROTOPIE_MODE;
-           Serial.println("[VALID] -> PROTOPIE mode");
-        }
-        else if (c == 'I') {
-           // Invalid Move - stay in maze mode to retry
-           state = MAZE_ARMED;
-           lastDir = DIR_NEUTRAL;  // Reset direction tracking
-           Serial.println("[INVALID] Try again");
-        }
-        else if (c == 'G') {
-           // Goal reached - auto switch to ProtoPie mode
-           Keyboard.write('g'); // Tell ProtoPie (goal reached)
-           state = PROTOPIE_MODE;
-           Serial.println("[GOAL] -> PROTOPIE mode");
-        }
       }
       break;
   }

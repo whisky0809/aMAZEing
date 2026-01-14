@@ -103,11 +103,20 @@ void loop() {
         game.triggerWin();
     }
 
+    // Check for start signal (ENTER button on R4)
+    if (uart_input.isStartRequested()) {
+        Serial.println("[GAME] Start signal received");
+        // Start signal triggers game init from start screen
+        if (game.isStartScreen()) {
+            game.handleInput(NORTH);  // Any direction triggers start
+        }
+    }
+
     // Update game logic
     game.update();
 
-    // Render to display
-    game.render(&display);
+    // Render to display (pass D9 held state for status bar)
+    game.render(&display, uart_input.isD9Held());
     
     // Game loop timing (~60 FPS)
     delay(16);

@@ -11,8 +11,8 @@
 enum GameMode {
     STATE_START,
     STATE_PLAYING,
-    STATE_GOAL_MESSAGE,  // Showing "A little bit more" rainbow text
-    STATE_WIN            // Showing win screen (player escaped)
+    STATE_GOAL_MESSAGE,    // Showing "A little bit more" rainbow text
+    STATE_WIN              // Showing win screen (player escaped)
 };
 
 // Move result for R4 acknowledgment
@@ -51,15 +51,15 @@ private:
     void handleTwoPlayerMove(Direction dir);
     bool isValidMove(const Player& p, Direction dir);
     void movePlayer(Player& p, Direction dir);
-    void renderStatusBar(DisplayManager* display);
+    void renderStatusBar(DisplayManager* display, bool d9_held);
     void renderTwoPlayer(DisplayManager* display);
     void renderPlayerFog(DisplayManager* display, const Player& p, uint16_t fog_color);
     void renderBlockedDirections(DisplayManager* display, const Player& p);
     void renderGoal(DisplayManager* display);
     void drawGoalBarrier(DisplayManager* display, uint8_t gx, uint8_t gy, const Player& p);
     void renderStartScreen(DisplayManager* display);
-    void renderGoalMessage(DisplayManager* display);  // "A little bit more" rainbow
-    void renderWinScreen(DisplayManager* display);    // Player escaped
+    void renderGoalMessage(DisplayManager* display);     // "A little bit more" rainbow
+    void renderWinScreen(DisplayManager* display);       // Player escaped
     bool isAdjacent(const Player& p, uint8_t gx, uint8_t gy);
     bool canReachGoal(const Player& p, uint8_t gx, uint8_t gy);
     uint16_t getGoalColorForDistance(uint8_t min_distance);
@@ -69,7 +69,7 @@ public:
     void init();
     void handleInput(Direction dir);
     void update();
-    void render(DisplayManager* display);
+    void render(DisplayManager* display, bool d9_held);
 
     uint8_t getActivePlayer();
     uint16_t getPlayerMoves(uint8_t player_id);
