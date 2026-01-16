@@ -11,7 +11,6 @@ void SpriteRenderer::initInstance(SpriteInstance* instance, const SpriteDefiniti
 const uint16_t* SpriteRenderer::getCurrentFrame(const SpriteInstance* instance) {
     const SpriteAnimation* anim = &instance->definition->idle;
 
-    // Read frame pointer from PROGMEM
     // frames is a pointer to an array of pointers in PROGMEM
     const uint16_t* const* frame_array = anim->frames;
     return (const uint16_t*)pgm_read_ptr(&frame_array[instance->current_frame]);
@@ -21,7 +20,7 @@ void SpriteRenderer::updateAnimation(SpriteInstance* instance) {
     const SpriteAnimation* anim = &instance->definition->idle;
     uint32_t now = millis();
 
-    // Check if enough time has elapsed to advance to next frame
+
     if (now - instance->last_frame_time >= anim->frame_duration_ms) {
         instance->current_frame = (instance->current_frame + 1) % anim->frame_count;
         instance->last_frame_time = now;
@@ -57,7 +56,7 @@ void SpriteRenderer::drawWithColorTint(DisplayManager* display, const SpriteInst
     // Draw pixel by pixel, replacing non-transparent pixels with tint color
     for (uint8_t py = 0; py < h; py++) {
         for (uint8_t px = 0; px < w; px++) {
-            // Read pixel from PROGMEM
+
             uint16_t pixel = pgm_read_word(&frame[py * w + px]);
 
             // Replace non-transparent pixels with tint color

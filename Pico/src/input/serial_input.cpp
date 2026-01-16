@@ -3,7 +3,7 @@
 
 SerialInput::SerialInput() {
     reset_requested = false;
-    // mode_toggle_requested = false;  // Disabled - always 2-player
+    // mode_toggle_requested = false;
 }
 
 Direction SerialInput::getCommand() {
@@ -31,9 +31,7 @@ Direction SerialInput::getCommand() {
         case 'R':
             reset_requested = true;
             return DIR_NONE;
-        // case 'T':  // Disabled - always 2-player mode
-        //     mode_toggle_requested = true;
-        //     return DIR_NONE;
+
         default:
             return DIR_NONE;
     }
@@ -41,17 +39,8 @@ Direction SerialInput::getCommand() {
 
 bool SerialInput::isResetRequested() {
     if (reset_requested) {
-        reset_requested = false;  // Clear flag
+        reset_requested = false;
         return true;
     }
     return false;
 }
-
-// Disabled - always 2-player mode
-// bool SerialInput::isToggleModeRequested() {
-//     if (mode_toggle_requested) {
-//         mode_toggle_requested = false;
-//         return true;
-//     }
-//     return false;
-// }

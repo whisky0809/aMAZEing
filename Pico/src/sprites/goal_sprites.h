@@ -8,8 +8,8 @@
 #include "sprite.h"
 
 // Color palette (will be replaced at runtime with distance-based colors)
-#define GD   0xFFFF  // Goal Door frame (placeholder - will be tinted)
-#define GI   0x2104  // Goal Interior (dark)
+#define GD   0xFFFF 
+#define GI   0x2104 
 #define _T_  TRANSPARENT_COLOR  // Transparent
 
 // Goal - Frame 0 (Door base)

@@ -40,9 +40,7 @@
 // Game Constants - RGB565 color format
 #define PLAYER_COLOR   0xF800  // Red
 #define GOAL_COLOR     0x07E0  // Green
-#define PATH_COLOR     0x001F  // Blue
 #define WALL_COLOR     0x0000  // Black
-#define VISITED_COLOR  0x2104  // Dim gray
 
 // Game settings
 // Cell size in pixels (each maze cell is CELL_SIZE x CELL_SIZE pixels on screen)
@@ -96,11 +94,5 @@
 #define TEXT_WIN_L3         "one more"
 #define TEXT_WIN_L4         "rabbit"
 #define TEXT_WIN_L5         "hole..."
-
-// Minigame Prompt Text (shown after valid move)
-#define TEXT_MINIGAME_L1    "Press"
-#define TEXT_MINIGAME_L2    "round"
-#define TEXT_MINIGAME_L3    "green"
-#define TEXT_MINIGAME_L4    "button"
 
 #endif // CONFIG_H

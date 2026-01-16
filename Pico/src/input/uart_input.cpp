@@ -43,15 +43,11 @@ Direction UARTInput::rawToDirection(uint16_t x, uint16_t y) {
         return DIR_NONE;
     }
 
-    // Choose dominant axis
     if (abs(dy) > abs(dx)) {
-        // Y axis dominant
-        // IMPORTANT:
-        // With typical joystick wiring, pushing UP usually makes ADC value go DOWN (dy < 0).
+        // Inverted: pushing UP lowers ADC value
         if (dy < 0) return NORTH;
         else        return SOUTH;
     } else {
-        // X axis dominant
         if (dx < 0) return WEST;
         else        return EAST;
     }

@@ -104,7 +104,7 @@ void GameState::resetGame() {
     Serial.println("DEBUG: Picking goal position...");
     #endif
 
-    // Pick goal position (ensure minimum distance from BOTH players)
+    // Initialize goal position
     uint8_t gx, gy;
     int dist_sq1, dist_sq2;
     int goal_attempts = 0;
@@ -117,7 +117,7 @@ void GameState::resetGame() {
         int dy1 = (int)sy - (int)gy;
         dist_sq1 = dx1*dx1 + dy1*dy1;
 
-        // Check dist from P2 (always 2-player)
+        // Check dist from P2
         int dx2 = (int)players[1].x - (int)gx;
         int dy2 = (int)players[1].y - (int)gy;
         dist_sq2 = dx2*dx2 + dy2*dy2;
@@ -210,26 +210,22 @@ void GameState::handleTwoPlayerMove(Direction dir) {
     Player& p = players[active_player];
 
     if (isValidMove(p, dir)) {
-        // Valid move: execute and switch turns
         movePlayer(p, dir);
         p.moves++;
 
-        // Generate directions for THIS player's new location
         maze.generateNewDirections(p.x, p.y);
         p.current_cell_dirs = maze.getCurrentDirections();
 
         if (maze.isGoal(p.x, p.y)) {
-            // Goal reached! Show message, relocate goal, continue game
             state = STATE_GOAL_MESSAGE;
             goalMessageStart = millis();
             lastMoveResult = MOVE_GOAL;
-            relocateGoal();  // Move goal to new position
+            relocateGoal();
             // Switch turns after goal reached
             active_player = 1 - active_player;
             return;
         }
 
-        // Valid move: switch turns (stay in STATE_PLAYING)
         active_player = 1 - active_player;
         lastMoveResult = MOVE_VALID;
     } else {
@@ -239,13 +235,13 @@ void GameState::handleTwoPlayerMove(Direction dir) {
 
 MoveResult GameState::getLastMoveResult() {
     MoveResult result = lastMoveResult;
-    lastMoveResult = MOVE_NONE;  // Clear after read
+    lastMoveResult = MOVE_NONE;
     return result;
 }
 
 void GameState::triggerWin() {
     if (state == STATE_PLAYING || state == STATE_GOAL_MESSAGE) {
-        winner = active_player;  // Current player wins (escaped)
+        winner = active_player;
         state = STATE_WIN;
         Serial.print("[GAME] Player ");
         Serial.print(winner + 1);
@@ -277,12 +273,12 @@ void GameState::movePlayer(Player& p, Direction dir) {
 }
 
 void GameState::update() {
-    // Update sprite animations (always 2-player)
+    // Update sprite animations
     SpriteRenderer::updateAnimation(&players[0].sprite);
     SpriteRenderer::updateAnimation(&players[1].sprite);
     SpriteRenderer::updateAnimation(&goal_sprite);
 
-    // Check if goal message display time has elapsed (2 seconds)
+    // Check if goal message display time has elapsed
     if (state == STATE_GOAL_MESSAGE && (millis() - goalMessageStart >= 2000)) {
         state = STATE_PLAYING;
     }
@@ -312,39 +308,32 @@ void GameState::renderStatusBar(DisplayManager* display, bool d9_held) {
     display->setCursor(2, 0);
 
     if (d9_held) {
-        // D9 held: show active player turn indicator
+        // Toggle held: show active player turn indicator
         display->setTextColor(players[active_player].color);
         display->print("P");
         display->print(active_player + 1);
         display->print(" GO!");
     } else {
-        // D9 not held: show "MiniWait" message
+        // Toggle not held: show "MiniWait" message
         display->setTextColor(0xFFFF);  // White
         display->print("MiniWait");
     }
 }
 
 void GameState::renderTwoPlayer(DisplayManager* display) {
-    // 1. Render Player 1's fog-of-war (blue)
     renderPlayerFog(display, players[0], P1_FOG_COLOR);
-    // 2. Render Player 1's blocked indicators
     renderBlockedDirections(display, players[0]);
 
-    // 3. Render Player 2's fog-of-war (purple)
     renderPlayerFog(display, players[1], P2_FOG_COLOR);
-    // 4. Render Player 2's blocked indicators
     renderBlockedDirections(display, players[1]);
 
-    // 5. Draw goal (always visible, shared)
     renderGoal(display);
 
-    // 6. Draw both players (always visible)
     SpriteRenderer::draw(display, &players[0].sprite,
                          players[0].x * CELL_SIZE, players[0].y * CELL_SIZE + MAZE_OFFSET_Y);
     SpriteRenderer::draw(display, &players[1].sprite,
                          players[1].x * CELL_SIZE, players[1].y * CELL_SIZE + MAZE_OFFSET_Y);
 
-    // 7. Draw turn indicator (corner square)
     display->drawRect(TURN_INDICATOR_X - 1, TURN_INDICATOR_Y - 1, 6, 6, ACTIVE_HIGHLIGHT);
     display->fillRect(TURN_INDICATOR_X, TURN_INDICATOR_Y, 4, 4,
                       players[active_player].color);
@@ -355,14 +344,11 @@ void GameState::renderPlayerFog(DisplayManager* display, const Player& p, uint16
     uint8_t gx = maze.getGoalX();
     uint8_t gy = maze.getGoalY();
 
-    // Helper lambda for drawing thick bordered cells
     auto drawThickBorder = [&](int16_t x, int16_t y) {
-        // Draw 2-pixel thick border (outer + inner rectangle)
         display->drawRect(x, y, CELL_SIZE, CELL_SIZE, fog_color);
         display->drawRect(x+1, y+1, CELL_SIZE-2, CELL_SIZE-2, fog_color);
     };
 
-    // Draw border for each valid adjacent cell (don't overdraw goal)
     if ((dirs & (1 << NORTH)) && p.y > 0) {
         if (!(p.x == gx && p.y - 1 == gy))
             drawThickBorder(p.x * CELL_SIZE, (p.y - 1) * CELL_SIZE + MAZE_OFFSET_Y);
@@ -386,20 +372,15 @@ void GameState::renderBlockedDirections(DisplayManager* display, const Player& p
     uint8_t gx = maze.getGoalX();
     uint8_t gy = maze.getGoalY();
 
-    // For each direction: if cell exists but direction blocked, draw red line
-    // on the NEIGHBOR cell's edge facing the player
-
-    // NORTH neighbor - draw red line on ITS bottom edge (facing player)
+    // Draw barrier on neighbor's edge facing player (skip goal cell)
     if (p.y > 0 && !(dirs & (1 << NORTH))) {
         int16_t nx = p.x * CELL_SIZE;
         int16_t ny = (p.y - 1) * CELL_SIZE + MAZE_OFFSET_Y;
-        // Skip if this is the goal cell (handled separately)
         if (!(p.x == gx && p.y - 1 == gy)) {
             display->fillRect(nx, ny + CELL_SIZE - 2, CELL_SIZE, 2, BLOCKED_COLOR);
         }
     }
 
-    // SOUTH neighbor - draw red line on ITS top edge (facing player)
     if (p.y < MAZE_HEIGHT - 1 && !(dirs & (1 << SOUTH))) {
         int16_t nx = p.x * CELL_SIZE;
         int16_t ny = (p.y + 1) * CELL_SIZE + MAZE_OFFSET_Y;
@@ -408,7 +389,6 @@ void GameState::renderBlockedDirections(DisplayManager* display, const Player& p
         }
     }
 
-    // EAST neighbor - draw red line on ITS left edge (facing player)
     if (p.x < MAZE_WIDTH - 1 && !(dirs & (1 << EAST))) {
         int16_t nx = (p.x + 1) * CELL_SIZE;
         int16_t ny = p.y * CELL_SIZE + MAZE_OFFSET_Y;
@@ -417,7 +397,6 @@ void GameState::renderBlockedDirections(DisplayManager* display, const Player& p
         }
     }
 
-    // WEST neighbor - draw red line on ITS right edge (facing player)
     if (p.x > 0 && !(dirs & (1 << WEST))) {
         int16_t nx = (p.x - 1) * CELL_SIZE;
         int16_t ny = p.y * CELL_SIZE + MAZE_OFFSET_Y;
@@ -431,14 +410,13 @@ void GameState::drawGoalBarrier(DisplayManager* display, uint8_t gx, uint8_t gy,
     int16_t gpx = gx * CELL_SIZE;
     int16_t gpy = gy * CELL_SIZE + MAZE_OFFSET_Y;
 
-    // Draw red barrier on the goal cell edge facing the player
-    if (p.x < gx) {  // Player is WEST of goal -> barrier on goal's LEFT edge
+    if (p.x < gx) {
         display->fillRect(gpx, gpy, 2, CELL_SIZE, BLOCKED_COLOR);
-    } else if (p.x > gx) {  // Player is EAST of goal -> barrier on goal's RIGHT edge
+    } else if (p.x > gx) {
         display->fillRect(gpx + CELL_SIZE - 2, gpy, 2, CELL_SIZE, BLOCKED_COLOR);
-    } else if (p.y < gy) {  // Player is NORTH of goal -> barrier on goal's TOP edge
+    } else if (p.y < gy) {
         display->fillRect(gpx, gpy, CELL_SIZE, 2, BLOCKED_COLOR);
-    } else if (p.y > gy) {  // Player is SOUTH of goal -> barrier on goal's BOTTOM edge
+    } else if (p.y > gy) {
         display->fillRect(gpx, gpy + CELL_SIZE - 2, CELL_SIZE, 2, BLOCKED_COLOR);
     }
 }
@@ -449,34 +427,34 @@ void GameState::renderGoal(DisplayManager* display) {
     int16_t gpx = gx * CELL_SIZE;
     int16_t gpy = gy * CELL_SIZE + MAZE_OFFSET_Y;
 
-    // Calculate distance for color (always 2-player)
+    // Calculate distance for color
     uint8_t dist1 = abs((int)players[0].x - (int)gx) + abs((int)players[0].y - (int)gy);
     uint8_t dist2 = abs((int)players[1].x - (int)gx) + abs((int)players[1].y - (int)gy);
     uint8_t min_dist = (dist2 < dist1) ? dist2 : dist1;
 
-    // Check adjacency and reachability for each player (always 2-player)
+    // Check adjacency and reachability for each player
     bool p1_adjacent = isAdjacent(players[0], gx, gy);
     bool p2_adjacent = isAdjacent(players[1], gx, gy);
     bool p1_can_reach = p1_adjacent && canReachGoal(players[0], gx, gy);
     bool p2_can_reach = p2_adjacent && canReachGoal(players[1], gx, gy);
 
     if (p1_can_reach || p2_can_reach) {
-        // ACCESSIBLE: Blue door with center 4x4 black ("open" look)
+        // ACCESSIBLE
         SpriteRenderer::drawWithColorTint(display, &goal_sprite, gpx, gpy, GOAL_ACCESSIBLE);
-        // Clear center 4x4 to black (makes door look "open")
         display->fillRect(gpx + 2, gpy + 2, 4, 4, 0x0000);
+
     } else if (p1_adjacent || p2_adjacent) {
-        // ADJACENT BUT BLOCKED: Green door + red barrier line
+        // ADJACENT BUT BLOCKED
         SpriteRenderer::drawWithColorTint(display, &goal_sprite, gpx, gpy, GOAL_COLOR);
-        // Draw barrier for whichever player is adjacent but blocked
         if (p1_adjacent && !p1_can_reach) {
             drawGoalBarrier(display, gx, gy, players[0]);
         }
         if (p2_adjacent && !p2_can_reach) {
             drawGoalBarrier(display, gx, gy, players[1]);
         }
+
     } else {
-        // NOT ADJACENT: Normal distance-based coloring
+        // NOT ADJACENT
         uint16_t goal_color = getGoalColorForDistance(min_dist);
         SpriteRenderer::drawWithColorTint(display, &goal_sprite, gpx, gpy, goal_color);
     }
@@ -508,48 +486,44 @@ bool GameState::canReachGoal(const Player& p, uint8_t gx, uint8_t gy) {
 void GameState::renderStartScreen(DisplayManager* display) {
     display->setTextSize(1);
     
-    // Line 1: "It's" (Centered)
-    // "It's" is 4 chars -> 24px wide. Center is (64-24)/2 = 20
-    display->setTextColor(0xFFFF); // White
+
+    display->setTextColor(0xFFFF);
     display->setCursor(20, 10);
     display->print(TEXT_TITLE_L1);
 
-    // Line 2: "aMAZEing"
-    // "aMAZEing" is 8 chars -> 48px wide. Center is (64-48)/2 = 8
-    // Start X = 8
     int cursorX = 8;
-    int cursorY = 22; // Line 2 Y position
+    int cursorY = 22;
 
-    // "a" - White
+
     display->setTextColor(0xFFFF);
     display->setCursor(cursorX, cursorY);
     display->print(TEXT_TITLE_L2_PRE);
-    cursorX += 6; // Advance 1 char
+    cursorX += 6;
 
-    // "MAZE" - Red
-    display->setTextColor(PLAYER_COLOR); // Red
+
+    display->setTextColor(PLAYER_COLOR);
     display->setCursor(cursorX, cursorY);
     display->print(TEXT_TITLE_L2_MAIN);
-    cursorX += 24; // Advance 4 chars
+    cursorX += 24;
 
-    // "ing" - White
-    display->setTextColor(0xFFFF); // White
+
+    display->setTextColor(0xFFFF);
     display->setCursor(cursorX, cursorY);
     display->print(TEXT_TITLE_L2_SUF);
 
-    // Footer
+
     display->setTextColor(GOAL_COLOR);
     display->setCursor(4, 55);
     display->print(TEXT_PRESS_KEY);
 }
 
 void GameState::renderGoalMessage(DisplayManager* display) {
-    // Display "A little bit more" with rainbow colors
+    // Display Goal message with rainbow colors
     display->setTextSize(1);
 
     // Calculate rainbow hue based on time for animation
     uint32_t elapsed = millis() - goalMessageStart;
-    uint8_t hue_offset = (elapsed / 50) % 256;  // Shift hue over time
+    uint8_t hue_offset = (elapsed / 50) % 256;
 
     // Rainbow colors array (6 colors cycling)
     uint16_t rainbow_colors[] = {
@@ -564,9 +538,9 @@ void GameState::renderGoalMessage(DisplayManager* display) {
     // Helper buffer for single character printing
     char buf[2] = {0, 0};
 
-    // Line 1 (centered)
+    
     const char* line1 = TEXT_GOAL_L1;
-    int16_t x1 = (64 - 8 * 6) / 2;  // 8 chars * 6px = 48px, center
+    int16_t x1 = (64 - 8 * 6) / 2; // Centered for 6 chars
     display->setCursor(x1, 18);
     for (int i = 0; line1[i] != '\0'; i++) {
         uint8_t color_idx = (i + hue_offset / 43) % 6;
@@ -575,12 +549,11 @@ void GameState::renderGoalMessage(DisplayManager* display) {
         display->print(buf);
     }
 
-    // Line 2 (centered)
     const char* line2 = TEXT_GOAL_L2;
-    int16_t x2 = (64 - 8 * 6) / 2;  // 8 chars * 6px = 48px, center
+    int16_t x2 = (64 - 8 * 6) / 2;  
     display->setCursor(x2, 32);
     for (int i = 0; line2[i] != '\0'; i++) {
-        uint8_t color_idx = (i + 4 + hue_offset / 43) % 6;  // Offset by 4 for continuity
+        uint8_t color_idx = (i + 4 + hue_offset / 43) % 6; 
         display->setTextColor(rainbow_colors[color_idx]);
         buf[0] = line2[i];
         display->print(buf);

@@ -12,7 +12,7 @@ enum GameMode {
     STATE_START,
     STATE_PLAYING,
     STATE_GOAL_MESSAGE,    // Showing "A little bit more" rainbow text
-    STATE_WIN              // Showing win screen (player escaped)
+    STATE_WIN              // Showing win screen
 };
 
 // Move result for R4 acknowledgment

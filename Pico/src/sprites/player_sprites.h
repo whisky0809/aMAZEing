@@ -27,41 +27,41 @@
 
 // Player 1 - Frame 0 (Left Arm Down, Right Arm Up)
 const uint16_t PROGMEM P1_IDLE_F0[] = {
-    // Row 0 - Top of head
+    // Row 0 
     _T_, _T_, B1,  B1,  B1,  B1,  _T_, _T_,
-    // Row 1 - Head with Eye (Top)
+    // Row 1
     _T_, B1, B1,  WH,  BK,  B1,  B1, _T_,
-    // Row 2 - Head with Eye (Bottom)
+    // Row 2
     _T_, B1,  B1,  BK,  BK,  B1,  B1,  _T_,
-    // Row 3 - Neck
+    // Row 3
     _T_,  _T_,  B1,  B1,  B1,  B1,  _T_,  B1,
-    // Row 4 - Arms (Left Arm Down tip, Right Arm Up body)
+    // Row 4
     B1,  B1,  B1,  B1,  B1,  B1,  B1,  B1,
-    // Row 5 - Waist
+    // Row 5
     B1, _T_,  B1,  B1,  B1,  B1,  _T_,  _T_,
-    // Row 6 - Legs (Left foot forward/down)
+    // Row 6
     _T_, _T_, B1,  _T_, _T_, B1,  B1,  _T_,
-    // Row 7 - Feet
+    // Row 7
     _T_, B1,  B1,  _T_, _T_, _T_, _T_, _T_,
 };
 
 // Player 1 - Frame 1 (Right Arm Down, Left Arm Up)
 const uint16_t PROGMEM P1_IDLE_F1[] = {
-    // Row 0 - Top of head
+    // Row 0 
     _T_, _T_, B1,  B1,  B1,  B1,  _T_, _T_,
-    // Row 1 - Head with Eye (Top) - Mirrored from F0
+    // Row 1
     _T_, B1, B1,  BK,  WH,  B1,  B1, _T_,
-    // Row 2 - Head with Eye (Bottom) - Mirrored from F0 (same)
+    // Row 2
     _T_, B1,  B1,  BK,  BK,  B1,  B1,  _T_,
-    // Row 3 - Neck - Mirrored from F0
+    // Row 3
     B1,  _T_, B1,  B1,  B1,  B1,  _T_, _T_,
-    // Row 4 - Arms (Left Arm Up body, Right Arm Down tip) - Mirrored from F0 (same)
+    // Row 4
     B1,  B1,  B1,  B1,  B1,  B1,  B1,  B1,
-    // Row 5 - Waist - Mirrored from F0
+    // Row 5
     _T_, _T_, B1,  B1,  B1,  B1,  _T_, B1,
-    // Row 6 - Legs (Right foot forward/down) - Mirrored from F0
+    // Row 6
     _T_, B1,  B1,  _T_, _T_, B1,  _T_, _T_,
-    // Row 7 - Feet - Mirrored from F0
+    // Row 7
     _T_, _T_, _T_, _T_, _T_, B1,  B1,  _T_,
 };
 
@@ -79,7 +79,7 @@ const uint16_t* const PROGMEM P1_IDLE_FRAMES[] = {
 #define B2   0xF800  // Body - Red (matching PLAYER2_COLOR)
 #define D2   0x0410  // Dark - shadow/outline
 #define L2   0x7FFF  // Light - highlight
-#define S2   0xFE73  // Skin - head (Unused in new design)
+#define S2   0xFE73  // Skin - head (Unused)
 
 // Player 2 - Frame 0 (Same shape as P1 F0)
 const uint16_t PROGMEM P2_IDLE_F0[] = {

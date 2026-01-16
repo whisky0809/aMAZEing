@@ -10,9 +10,7 @@ void MazeGenerator::init() {
     goal_x = MAZE_WIDTH - 1;
     goal_y = MAZE_HEIGHT - 1;
 
-    // Pick a random seed for this maze instance
-    // This ensures the maze is consistent (deterministic) for all players
-    // during a single game session, but different between resets.
+
     maze_seed = random(1000000);
 }
 
@@ -21,7 +19,7 @@ uint8_t MazeGenerator::getCurrentDirections() {
 }
 
 bool MazeGenerator::isDirectionValid(uint8_t x, uint8_t y, Direction dir) {
-    // Check if direction is out of bounds (physically impossible)
+    // Check if direction is out of bounds
     if (isOutOfBounds(x, y, dir)) {
         return false;
     }
@@ -31,10 +29,7 @@ bool MazeGenerator::isDirectionValid(uint8_t x, uint8_t y, Direction dir) {
 }
 
 void MazeGenerator::generateNewDirections(uint8_t x, uint8_t y) {
-    // Reverted to non-deterministic generation per user request.
-    // This prevents players from getting permanently stuck in loops
-    // by allowing the maze structure to change when a cell is re-visited.
-    // Note: Players may see different walls at the same location.
+    // Non-deterministic: allows escaping loops by revisiting cells
     // randomSeed(maze_seed + (long)x * 37 + (long)y * 73); 
 
     uint8_t dirs = 0;
@@ -49,27 +44,23 @@ void MazeGenerator::generateNewDirections(uint8_t x, uint8_t y) {
     while (added < num_exits && attempts < 10) {
         Direction dir = (Direction)(random() % 4); // Pick 0-3
 
-        // Check 1: Is it physically possible? (Not off edge of map)
-        // Check 2: Have we already picked this direction? (!(dirs & (1 << dir)))
         if (!isOutOfBounds(x, y, dir) && !(dirs & (1 << dir))) {
-            // Add direction to the bitmask using OR operator
             dirs |= (1 << dir);
             added++;
         }
         attempts++;
     }
 
-    // Failsafe: Ensure at least one direction is available if the loop failed
+    // Ensure at least one exit
     if (dirs == 0) {
         for (int d = 0; d < 4; d++) {
             if (!isOutOfBounds(x, y, (Direction)d)) {
                 dirs |= (1 << d);
-                break; // Found one valid exit, stop.
+                break;
             }
         }
     }
 
-    // Store the generated exits for the current cell
     current_cell_dirs = dirs;
 }
 

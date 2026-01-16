@@ -6,6 +6,3 @@
 
 # Backup/archive files
 *.zip
-
-# Claude Code settings (local)
-.claude/
