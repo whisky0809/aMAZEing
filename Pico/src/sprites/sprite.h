@@ -6,7 +6,7 @@
 #include <Arduino.h>
 #include "../display/display_manager.h"
 
-// Transparency marker - magenta (common game dev convention)
+// Transparency marker - magenta
 #define TRANSPARENT_COLOR 0xF81F  // RGB565 magenta (R=31, G=0, B=31)
 
 // Single animation sequence
@@ -33,7 +33,6 @@ struct SpriteInstance {
 // Sprite renderer class
 class SpriteRenderer {
 public:
-    // Initialize a sprite instance with a definition
     static void initInstance(SpriteInstance* instance, const SpriteDefinition* def);
 
     // Update animation frame based on elapsed time

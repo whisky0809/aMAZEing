@@ -22,5 +22,3 @@ Thumbs.db
 tmp*/
 *.tmp
 
-# Claude Code temp files
-tmpclaude-*
